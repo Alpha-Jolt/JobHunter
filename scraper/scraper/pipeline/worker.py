@@ -45,7 +45,13 @@ async def run_scraper_job(
     elif scraper_name == "naukri":
         from scraper.sources.naukri_scraper import NaukriScraper  # noqa: PLC0415
 
-        async with NaukriScraper(rate_limiter, retry_handler, debug=config.dev_mode) as scraper:
+        async with BrowserManager(
+            headless=config.headless,
+            pool_size=config.browser_pool_size,
+            timeout_ms=config.scraper_timeout_ms,
+        ) as bm:
+            scraper = NaukriScraper(bm, rate_limiter, retry_handler, debug=config.dev_mode)
+            await scraper.initialize()
             await pipeline.execute(scraper, keywords, locations, pages=config.pages_per_search)
 
     else:

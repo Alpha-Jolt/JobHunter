@@ -66,6 +66,8 @@ class BrowserManager:
         return await self._playwright.chromium.launch(
             headless=self.headless,
             args=[
+                "--no-sandbox",  # required on Linux/WSL
+                "--disable-setuid-sandbox",
                 "--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage",
                 "--no-first-run",
@@ -90,6 +92,12 @@ class BrowserManager:
         context: BrowserContext = await browser.new_context(
             viewport=viewport,
             user_agent=user_agent,
+            # Override Sec-Ch-Ua to hide HeadlessChrome fingerprint
+            extra_http_headers={
+                "Sec-Ch-Ua": '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
+                "Sec-Ch-Ua-Mobile": "?0",
+                "Sec-Ch-Ua-Platform": '"Windows"',
+            },
         )
         page = await context.new_page()
         page.set_default_timeout(self.timeout_ms)

@@ -217,9 +217,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# agents
+# editor and agents
 .agent
 .kiro
+.vscode
+.antigravity
+.claude
 implementation
 
 # Work Logs

@@ -1,4 +1,4 @@
-"""Setup configuration for jobhunter-scraper package."""
+"""Setup configuration for scraper package."""
 
 from setuptools import find_packages, setup
 
@@ -6,7 +6,7 @@ with open("README.md", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
-    name="jobhunter-scraper",
+    name="scraper",
     version="0.1.0",
     description="JobHunter Scraper Engine — Phase 0 MVP",
     long_description=long_description,
@@ -41,7 +41,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "jobhunter-scraper=dev_mode.dev_runner:main",
+            "scraper=dev_mode.dev_runner:main",
         ],
     },
     classifiers=[
