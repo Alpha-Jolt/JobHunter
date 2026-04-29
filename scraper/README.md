@@ -113,5 +113,6 @@ python scripts/validate_output.py
 ## Phase 0 limitations
 
 - LinkedIn scraper is a stub (returns empty list) — full implementation in Phase 1
+- Indeed Scraper currently deprecated - Needs fix
 - Database output raises `NotImplementedError` — PostgreSQL integration in Phase 0+
 - Redis scheduler requires a running Redis instance — not needed for `dev_runner`
