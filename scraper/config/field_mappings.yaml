@@ -1,0 +1,17 @@
+indeed:
+  title: "jobTitle"
+  company: "companyName"
+  location: "jobLocation"
+  salary: "salary"
+  description: "jobDescription"
+  posted_date: "datePosted"
+
+naukri:
+  title: "title"
+  company: "companyName"
+  location: "placeholders.0.label"
+  salary: "salary.label"
+  experience: "experience.label"
+  description: "jobDescription"
+  posted_date: "footerPlaceholderLabel"
+  skills: "tagsAndSkills"

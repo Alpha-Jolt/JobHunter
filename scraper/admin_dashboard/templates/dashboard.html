@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobHunter Admin</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header><h1>JobHunter Scraper — Admin Dashboard</h1></header>
+  <main>
+    <section id="stats">
+      <h2>Job Stats</h2>
+      <div id="stats-output">Loading…</div>
+    </section>
+    <section id="trigger">
+      <h2>Trigger Scraper</h2>
+      <button onclick="trigger('naukri')">Run Naukri</button>
+      <button onclick="trigger('indeed')">Run Indeed</button>
+      <div id="trigger-output"></div>
+    </section>
+    <section id="logs">
+      <h2>Recent Logs</h2>
+      <pre id="log-output">Loading…</pre>
+    </section>
+  </main>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

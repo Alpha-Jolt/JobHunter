@@ -1,0 +1,34 @@
+scrapers:
+  indeed:
+    enabled: true
+    base_url: "https://in.indeed.com/jobs"
+    timeout_ms: 30000
+    pages_per_search: 5
+    rate_limit: 1.0
+
+  naukri:
+    enabled: true
+    base_url: "https://www.naukri.com/api/v5"
+    timeout_ms: 15000
+    pages_per_search: 5
+    rate_limit: 0.5
+
+  linkedin:
+    enabled: false
+    reason: "API partnership pending"
+
+pipeline:
+  extraction:
+    enabled: true
+  cleaning:
+    enabled: true
+  normalization:
+    enabled: true
+  deduplication:
+    enabled: true
+
+output:
+  formats:
+    - json
+    - csv
+  directory: "output"

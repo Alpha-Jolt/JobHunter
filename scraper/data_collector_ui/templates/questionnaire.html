@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobHunter — Find Your Job</title>
+  <link rel="stylesheet" href="/static/css/form_style.css">
+</head>
+<body>
+  <main>
+    <h1>JobHunter</h1>
+    <p>Tell us what you're looking for and we'll find the best matches.</p>
+    <form id="prefs-form">
+      <label>Job Keywords (comma-separated)
+        <input type="text" id="keywords" placeholder="Python Developer, Data Analyst" required>
+      </label>
+      <label>Locations (comma-separated)
+        <input type="text" id="locations" placeholder="Bangalore, Mumbai" required>
+      </label>
+      <label>Experience Level
+        <select id="experience">
+          <option value="">Any</option>
+          <option value="fresher">Fresher</option>
+          <option value="mid">Mid-level</option>
+          <option value="senior">Senior</option>
+        </select>
+      </label>
+      <label>Remote Preference
+        <select id="remote">
+          <option value="">Any</option>
+          <option value="remote">Remote</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="onsite">Onsite</option>
+        </select>
+      </label>
+      <button type="submit">Start Job Search</button>
+    </form>
+    <div id="result"></div>
+  </main>
+  <script src="/static/js/form_validation.js"></script>
+</body>
+</html>

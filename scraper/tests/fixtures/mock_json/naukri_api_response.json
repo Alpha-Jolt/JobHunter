@@ -1,0 +1,36 @@
+{
+  "jobDetails": [
+    {
+      "jobId": "naukri_001",
+      "title": "Python Developer",
+      "companyName": "Acme Corp",
+      "placeholders": [{"label": "Bangalore"}],
+      "salary": {"label": "5-8 Lacs PA"},
+      "experience": {"label": "2-5 Yrs"},
+      "jobDescription": "We are looking for a Python developer with Django experience.",
+      "jdURL": "https://www.naukri.com/job-listings-python-developer-acme-corp-bangalore-2-to-5-years-naukri_001",
+      "footerPlaceholderLabel": "3 Days Ago",
+      "tagsAndSkills": [
+        {"label": "Python"},
+        {"label": "Django"},
+        {"label": "REST API"}
+      ]
+    },
+    {
+      "jobId": "naukri_002",
+      "title": "Senior Backend Engineer",
+      "companyName": "Beta Technologies",
+      "placeholders": [{"label": "Mumbai"}],
+      "salary": {"label": "10-15 Lacs PA"},
+      "experience": {"label": "5-8 Yrs"},
+      "jobDescription": "Senior backend engineer with Python and microservices experience.",
+      "jdURL": "https://www.naukri.com/job-listings-senior-backend-engineer-beta-technologies-mumbai-naukri_002",
+      "footerPlaceholderLabel": "1 Week Ago",
+      "tagsAndSkills": [
+        {"label": "Python"},
+        {"label": "Microservices"},
+        {"label": "Docker"}
+      ]
+    }
+  ]
+}
