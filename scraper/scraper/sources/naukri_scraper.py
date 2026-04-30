@@ -1,14 +1,13 @@
 """Naukri.com scraper using Playwright + JSON-LD extraction.
 
-The previous HTTP API (POST /api/v5/jobs/search) returns HTTP 301 → homepage.
-Naukri now requires a real browser session. Job data is extracted from the
-application/ld+json ItemList block embedded in each search results page.
+Search results: ItemList JSON-LD → job URLs
+Job details: JobPosting JSON-LD → full data (description, salary, company, etc.)
 """
 
 import re
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
 
@@ -21,14 +20,14 @@ from scraper.sources.base_scraper import BaseScraper
 DOMAIN = "www.naukri.com"
 BASE_URL = "https://www.naukri.com"
 
-# Regex to extract the ItemList JSON-LD block
-_ITEM_LIST_RE = re.compile(
-    r'<script type="application/ld\+json">(\{[^<]*"@type"\s*:\s*"ItemList"[^<]*\})</script>',
-    re.DOTALL,
-)
-
-# Regex to extract job ID from Naukri URL slug
 _JOB_ID_RE = re.compile(r"-(\d{12,})$")
+
+# Experience level → (min_years, max_years) for post-scrape filtering
+_EXPERIENCE_FILTER: Dict[str, Tuple[int, int]] = {
+    "fresher": (0, 2),
+    "mid": (3, 7),
+    "senior": (8, 99),
+}
 
 
 class NaukriScraper(BaseScraper):
@@ -48,7 +47,7 @@ class NaukriScraper(BaseScraper):
         self.logger.info("NaukriScraper ready")
 
     async def close(self) -> None:
-        pass  # BrowserManager lifecycle managed externally
+        pass
 
     def get_source_name(self) -> str:
         return "naukri"
@@ -58,6 +57,7 @@ class NaukriScraper(BaseScraper):
         keywords: List[str],
         locations: List[str],
         pages: int = 5,
+        experience: Optional[str] = None,
         **kwargs,
     ) -> List[IntermediateJob]:
         results: List[IntermediateJob] = []
@@ -69,6 +69,7 @@ class NaukriScraper(BaseScraper):
                         keyword,
                         location,
                         pages,
+                        experience,
                     )
                     results.extend(jobs)
                     self.logger.info(
@@ -92,21 +93,28 @@ class NaukriScraper(BaseScraper):
         return results
 
     async def _scrape_keyword_location(
-        self, keyword: str, location: str, pages: int
+        self,
+        keyword: str,
+        location: str,
+        pages: int,
+        experience: Optional[str],
     ) -> List[IntermediateJob]:
         jobs: List[IntermediateJob] = []
         for page_num in range(1, pages + 1):
-            page_jobs = await self._scrape_page(keyword, location, page_num)
+            page_jobs = await self._scrape_page(keyword, location, page_num, experience)
             jobs.extend(page_jobs)
             if not page_jobs:
                 break
         return jobs
 
     async def _scrape_page(
-        self, keyword: str, location: str, page_num: int
+        self,
+        keyword: str,
+        location: str,
+        page_num: int,
+        experience: Optional[str],
     ) -> List[IntermediateJob]:
-        """Scrape one search results page via Playwright and extract JSON-LD."""
-        # Build SEO-style URL that Naukri uses
+        """Scrape one search results page and fetch details for each job."""
         kw_slug = keyword.lower().replace(" ", "-")
         loc_slug = location.lower().replace(" ", "-")
         url = f"{BASE_URL}/{kw_slug}-jobs-in-{loc_slug}"
@@ -121,16 +129,29 @@ class NaukriScraper(BaseScraper):
             try:
                 await page.wait_for_load_state("networkidle", timeout=15_000)
             except Exception:
-                pass  # Proceed even if networkidle times out
+                pass
             await page.wait_for_timeout(2_000)
 
             content = await page.content()
-            jobs = self._extract_from_jsonld(content, keyword, location)
+            job_urls = self._extract_job_urls(content)
 
             self.logger.debug(
-                "Naukri page scraped",
-                extra_data={"url": url, "jobs": len(jobs), "page": page_num},
+                "Naukri listing page",
+                extra_data={"url": url, "job_urls": len(job_urls), "page": page_num},
             )
+
+            # Reuse the same browser context for all detail pages (avoids resource exhaustion)
+            context = page.context
+            jobs: List[IntermediateJob] = []
+            for job_url in job_urls:
+                job = await self._fetch_job_detail_in_context(context, job_url)
+                if job:
+                    jobs.append(job)
+
+            # Apply experience filter
+            if experience and experience in _EXPERIENCE_FILTER:
+                jobs = self._filter_by_experience(jobs, experience)
+
             return jobs
 
         except PlaywrightTimeout:
@@ -147,105 +168,211 @@ class NaukriScraper(BaseScraper):
             if page:
                 await page.context.close()
 
-    def _extract_from_jsonld(
-        self, html: str, keyword: str, location: str
-    ) -> List[IntermediateJob]:
-        """Extract jobs from the application/ld+json ItemList block."""
+    def _extract_job_urls(self, html: str) -> List[str]:
+        """Extract job detail URLs from the ItemList JSON-LD block."""
         import json  # noqa: PLC0415
 
-        jobs: List[IntermediateJob] = []
-
-        # Find all JSON-LD blocks and pick the ItemList one
         blocks = re.findall(
             r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
         )
-        item_list = None
         for block in blocks:
             try:
                 data = json.loads(block)
                 if data.get("@type") == "ItemList":
-                    item_list = data
+                    return [
+                        item.get("url", "")
+                        for item in data.get("itemListElement", [])
+                        if item.get("url")
+                    ]
+            except json.JSONDecodeError:
+                continue
+
+        self.logger.warning("No ItemList JSON-LD found on Naukri page")
+        return []
+
+    async def _fetch_job_detail_in_context(
+        self, context, job_url: str
+    ) -> Optional[IntermediateJob]:
+        """Fetch a job detail page reusing an existing browser context."""
+        await self.rate_limiter.acquire(DOMAIN)
+        detail_page = None
+        start = time.monotonic()
+        try:
+            detail_page = await context.new_page()
+            await detail_page.goto(job_url, timeout=40_000)
+            try:
+                await detail_page.wait_for_load_state("networkidle", timeout=12_000)
+            except Exception:
+                pass
+            await detail_page.wait_for_timeout(1_000)
+
+            content = await detail_page.content()
+            return self._parse_job_posting(content, job_url, time.monotonic() - start)
+
+        except Exception as exc:
+            self.logger.warning(
+                "Job detail fetch failed",
+                extra_data={"url": job_url, "error": str(exc)},
+            )
+            return None
+        finally:
+            if detail_page:
+                await detail_page.close()
+
+    def _parse_job_posting(
+        self, html: str, job_url: str, duration_s: float
+    ) -> Optional[IntermediateJob]:
+        """Extract IntermediateJob from JobPosting JSON-LD on a detail page."""
+        import json  # noqa: PLC0415
+
+        blocks = re.findall(
+            r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
+        )
+        posting = None
+        for block in blocks:
+            try:
+                data = json.loads(block)
+                if data.get("@type") == "JobPosting":
+                    posting = data
                     break
             except json.JSONDecodeError:
                 continue
 
-        if not item_list:
-            self.logger.warning("No ItemList JSON-LD found on Naukri page")
-            return []
+        if not posting:
+            # Fallback: build minimal record from URL slug
+            return self._fallback_from_url(job_url, duration_s)
 
-        for item in item_list.get("itemListElement", []):
-            job = self._parse_item(item)
-            if job:
-                jobs.append(job)
+        match = _JOB_ID_RE.search(job_url)
+        job_id = match.group(1) if match else job_url.split("/")[-1]
 
-        return jobs
+        # Company
+        org = posting.get("hiringOrganization") or {}
+        company = org.get("name") if isinstance(org, dict) else None
 
-    def _parse_item(self, item: Dict) -> Optional[IntermediateJob]:
-        """Parse a single ItemList entry into an IntermediateJob."""
-        start = time.monotonic()
-        try:
-            url = item.get("url", "")
-            title = item.get("name", "")
-            if not url or not title:
-                return None
+        # Location
+        loc_data = posting.get("jobLocation") or {}
+        addr = loc_data.get("address", {}) if isinstance(loc_data, dict) else {}
+        localities = addr.get("addressLocality", []) if isinstance(addr, dict) else []
+        location_raw = ", ".join(localities) if isinstance(localities, list) else str(localities)
 
-            # Extract job ID from URL slug (last numeric segment)
-            match = _JOB_ID_RE.search(url)
-            job_id = match.group(1) if match else url.split("/")[-1]
+        # Salary — check baseSalary first, then text alternatives
+        salary_raw = self._extract_salary(posting)
 
-            # Parse company/location/experience from URL slug
-            slug = url.split("/job-listings-")[-1] if "job-listings-" in url else ""
-            company_raw, location_raw, experience_raw = self._parse_slug(slug)
+        # Experience in months → "X years"
+        exp_data = posting.get("experienceRequirements") or {}
+        months = exp_data.get("monthsOfExperience") if isinstance(exp_data, dict) else None
+        experience_raw = None
+        if months:
+            try:
+                years = int(months) // 12
+                experience_raw = f"{years} years"
+            except (ValueError, TypeError):
+                experience_raw = str(months)
 
-            duration_ms = (time.monotonic() - start) * 1000
+        # Description — strip HTML tags
+        description_html = posting.get("description", "")
+        description = (
+            re.sub(r"<[^>]+>", " ", description_html).strip() if description_html else None
+        )
 
-            return IntermediateJob(
-                source="naukri",
-                external_id=job_id,
-                raw_url=url,
-                title=title,
-                company_name=company_raw,
-                location_raw=location_raw,
-                experience_raw=experience_raw,
-                apply_url=url,
-                extraction_timestamp=datetime.utcnow(),
-                extraction_duration_ms=duration_ms,
-                extraction_source="html_parser",
-            )
-        except Exception as exc:
-            self.logger.warning(
-                "Item parse failed", extra_data={"error": str(exc)}
-            )
-            return None
+        # Skills
+        skills_raw_val = posting.get("skills", "")
+        if isinstance(skills_raw_val, str):
+            skills = [s.strip() for s in skills_raw_val.split(",") if s.strip()]
+        elif isinstance(skills_raw_val, list):
+            skills = [str(s).strip() for s in skills_raw_val if s]
+        else:
+            skills = []
+
+        # Job type
+        job_type_raw = posting.get("employmentType", "")
+
+        # Date posted
+        posted_date_raw = posting.get("datePosted", "")
+
+        return IntermediateJob(
+            source="naukri",
+            external_id=job_id,
+            raw_url=job_url,
+            title=posting.get("title", ""),
+            company_name=company,
+            location_raw=location_raw or None,
+            salary_raw=salary_raw,
+            experience_raw=experience_raw,
+            job_type_raw=job_type_raw or None,
+            description=description,
+            posted_date_raw=posted_date_raw or None,
+            apply_url=job_url,
+            skills_required_raw=skills,
+            extraction_timestamp=datetime.utcnow(),
+            extraction_duration_ms=duration_s * 1000,
+            extraction_source="html_parser",
+        )
 
     @staticmethod
-    def _parse_slug(slug: str) -> tuple:
-        """
-        Extract company, location, experience from Naukri URL slug.
+    def _extract_salary(posting: Dict) -> Optional[str]:
+        """Extract salary string from JobPosting, trying multiple fields."""
+        base = posting.get("baseSalary")
+        if isinstance(base, dict):
+            val = base.get("value", {})
+            if isinstance(val, dict):
+                amount = val.get("value", "")
+                unit = val.get("unitText", "")
+                currency = base.get("currency", "INR")
+                if amount and str(amount).lower() not in ("not disclosed", "not mentioned", ""):
+                    return f"{currency} {amount} {unit}".strip()
+        # Alternate: check estimatedSalary
+        est = posting.get("estimatedSalary")
+        if isinstance(est, dict):
+            val = est.get("value", {})
+            if isinstance(val, dict):
+                mn = val.get("minValue")
+                mx = val.get("maxValue")
+                unit = val.get("unitText", "")
+                currency = est.get("currency", "INR")
+                if mn or mx:
+                    return f"{currency} {mn}-{mx} {unit}".strip()
+        return None
 
-        Slug format: {title}-{company}-{locations}-{exp}-years-{id}
-        Example: python-developer-tata-consultancy-services-bengaluru-4-to-8-years-300326006122
-        """
-        # Remove trailing job ID
+    def _fallback_from_url(self, job_url: str, duration_s: float) -> Optional[IntermediateJob]:
+        """Minimal record from URL slug when JSON-LD is unavailable."""
+        match = _JOB_ID_RE.search(job_url)
+        job_id = match.group(1) if match else job_url.split("/")[-1]
+        slug = job_url.split("/job-listings-")[-1] if "job-listings-" in job_url else ""
         slug = _JOB_ID_RE.sub("", slug).strip("-")
 
-        # Experience pattern: "X-to-Y-years" or "X-years"
-        exp_match = re.search(r"(\d+-to-\d+-years|\d+-years)", slug)
-        experience_raw = exp_match.group(1).replace("-", " ") if exp_match else None
-        if exp_match:
-            slug = slug[: exp_match.start()].strip("-")
+        exp_match = re.search(r"(\d+)-to-(\d+)-years", slug)
+        experience_raw = (
+            f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match else None
+        )
 
-        # Split remaining into parts — heuristic: last 1-3 parts are location
-        parts = slug.split("-")
-        # Company is typically after the title keywords (first 2-3 words)
-        # This is a best-effort parse from the slug
-        company_raw = None
-        location_raw = None
+        return IntermediateJob(
+            source="naukri",
+            external_id=job_id,
+            raw_url=job_url,
+            experience_raw=experience_raw,
+            apply_url=job_url,
+            extraction_timestamp=datetime.utcnow(),
+            extraction_duration_ms=duration_s * 1000,
+            extraction_source="html_parser",
+        )
 
-        if len(parts) > 4:
-            # Middle section tends to be company name
-            mid = len(parts) // 2
-            company_raw = " ".join(p.capitalize() for p in parts[2:mid])
-            location_raw = " ".join(p.capitalize() for p in parts[mid:])
-
-        return company_raw, location_raw, experience_raw
+    @staticmethod
+    def _filter_by_experience(
+        jobs: List[IntermediateJob], experience: str
+    ) -> List[IntermediateJob]:
+        """Filter jobs to match the requested experience level."""
+        min_y, max_y = _EXPERIENCE_FILTER[experience]
+        filtered = []
+        for job in jobs:
+            exp_raw = job.experience_raw or ""
+            nums = re.findall(r"\d+", exp_raw)
+            if not nums:
+                # No experience info — only include for fresher (open to all)
+                if experience == "fresher":
+                    filtered.append(job)
+                continue
+            job_min = int(nums[0])
+            if job_min <= max_y:
+                filtered.append(job)
+        return filtered

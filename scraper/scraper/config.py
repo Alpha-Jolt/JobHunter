@@ -23,7 +23,7 @@ class Config(BaseSettings):
     scraper_timeout_ms: int = Field(default=30_000, ge=1_000)
     debug_screenshots: bool = False
     dev_mode: bool = True
-    pages_per_search: int = Field(default=5, ge=1, le=50)
+    pages_per_search: int = Field(default=1, ge=1, le=50)
 
     # --- Rate Limiting (requests per second) ---
     indeed_rate_limit: float = Field(default=1.0, gt=0)

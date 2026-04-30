@@ -133,7 +133,22 @@ class IndeedScraper(BaseScraper):
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            await page.goto(url, timeout=30_000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=12_000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(3_000)
+
+            # Detect Cloudflare block
+            title = await page.title()
+            if "just a moment" in title.lower():
+                self.logger.warning(
+                    "Indeed blocked by Cloudflare",
+                    extra_data={"url": url},
+                )
+                return []
+
             await self._scroll_to_load_jobs(page)
 
             cards = await page.query_selector_all(SELECTORS["job_cards"])
@@ -213,7 +228,16 @@ class IndeedScraper(BaseScraper):
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(job_url, wait_until="domcontentloaded", timeout=30_000)
+            await page.goto(job_url, timeout=30_000)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=12_000)
+            except Exception:
+                pass
+            await page.wait_for_timeout(2_000)
+
+            title = await page.title()
+            if "just a moment" in title.lower():
+                return None
 
             desc_el = await page.query_selector(SELECTORS["description"])
             description = (await desc_el.inner_text()).strip() if desc_el else ""

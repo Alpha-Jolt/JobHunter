@@ -1,11 +1,9 @@
 """Data collector form submission routes."""
 
-import json
 from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, BackgroundTasks
-from fastapi.responses import JSONResponse
 
 from data_collector_ui.models import JobPreferences
 
@@ -31,4 +29,9 @@ async def _trigger_scrape(prefs: JobPreferences) -> None:
 
     runner = DevModeRunner()
     for source in prefs.sources:
-        await runner.run_full_pipeline(source, prefs.keywords, prefs.locations)
+        await runner.run_full_pipeline(
+            source,
+            prefs.keywords,
+            prefs.locations,
+            experience=prefs.experience,
+        )
