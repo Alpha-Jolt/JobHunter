@@ -137,9 +137,7 @@ class IndeedScraper(BaseScraper):
                 break  # No more results
         return jobs
 
-    async def _scrape_page(
-        self, keyword: str, location: str, offset: int
-    ) -> List[IntermediateJob]:
+    async def _scrape_page(self, keyword: str, location: str, offset: int) -> List[IntermediateJob]:
         url = (
             f"{BASE_URL}"
             f"?q={quote_plus(keyword)}"
@@ -151,9 +149,7 @@ class IndeedScraper(BaseScraper):
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(
-                url, timeout=30_000, wait_until="domcontentloaded"
-            )
+            await page.goto(url, timeout=30_000, wait_until="domcontentloaded")
             # Wait for Cloudflare challenge to resolve (up to 15 s)
             for _ in range(_CF_MAX_POLLS):
                 title = await page.title()
@@ -168,9 +164,7 @@ class IndeedScraper(BaseScraper):
                 return []
 
             try:
-                await page.wait_for_load_state(
-                    "networkidle", timeout=10_000
-                )
+                await page.wait_for_load_state("networkidle", timeout=10_000)
             except Exception:
                 pass
             await page.wait_for_timeout(2_000)
@@ -202,9 +196,7 @@ class IndeedScraper(BaseScraper):
             if page:
                 await page.context.close()
 
-    async def _extract_job_from_card(
-        self, list_page: Page, card
-    ) -> Optional[IntermediateJob]:
+    async def _extract_job_from_card(self, list_page: Page, card) -> Optional[IntermediateJob]:
         start = time.monotonic()
 
         link_el = await card.query_selector(SELECTORS["job_link"])
@@ -218,28 +210,16 @@ class IndeedScraper(BaseScraper):
         job_url = f"https://in.indeed.com/viewjob?jk={job_key}"
 
         title_el = await card.query_selector(SELECTORS["job_title"])
-        title = (
-            (await title_el.inner_text()).strip() if title_el else None
-        )
+        title = (await title_el.inner_text()).strip() if title_el else None
 
         company_el = await card.query_selector(SELECTORS["company_name"])
-        company = (
-            (await company_el.inner_text()).strip()
-            if company_el
-            else None
-        )
+        company = (await company_el.inner_text()).strip() if company_el else None
 
         location_el = await card.query_selector(SELECTORS["location"])
-        location = (
-            (await location_el.inner_text()).strip()
-            if location_el
-            else None
-        )
+        location = (await location_el.inner_text()).strip() if location_el else None
 
         salary_el = await card.query_selector(SELECTORS["salary"])
-        salary = (
-            (await salary_el.inner_text()).strip() if salary_el else None
-        )
+        salary = (await salary_el.inner_text()).strip() if salary_el else None
 
         details = await self._get_full_job_details(job_url)
         duration_ms = (time.monotonic() - start) * 1000
@@ -252,15 +232,9 @@ class IndeedScraper(BaseScraper):
             company_name=company,
             location_raw=location,
             salary_raw=salary,
-            description=(
-                details.get("description") if details else None
-            ),
-            job_type_raw=(
-                details.get("job_type") if details else None
-            ),
-            posted_date_raw=(
-                details.get("posted_date") if details else None
-            ),
+            description=(details.get("description") if details else None),
+            job_type_raw=(details.get("job_type") if details else None),
+            posted_date_raw=(details.get("posted_date") if details else None),
             apply_url=job_url,
             skills_required_raw=self._extract_skills(
                 details.get("description", "") if details else ""
@@ -270,16 +244,12 @@ class IndeedScraper(BaseScraper):
             extraction_source="html_parser",
         )
 
-    async def _get_full_job_details(
-        self, job_url: str
-    ) -> Optional[Dict]:
+    async def _get_full_job_details(self, job_url: str) -> Optional[Dict]:
         await self.rate_limiter.acquire(DOMAIN)
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(
-                job_url, timeout=30_000, wait_until="domcontentloaded"
-            )
+            await page.goto(job_url, timeout=30_000, wait_until="domcontentloaded")
             # Wait for Cloudflare challenge to resolve (up to 12 s)
             for _ in range(_CF_MAX_POLLS - 1):
                 title = await page.title()
@@ -290,37 +260,22 @@ class IndeedScraper(BaseScraper):
                 return None
 
             try:
-                await page.wait_for_load_state(
-                    "networkidle", timeout=10_000
-                )
+                await page.wait_for_load_state("networkidle", timeout=10_000)
             except Exception:
                 pass
             await page.wait_for_timeout(1_500)
 
             desc_el = await page.query_selector(SELECTORS["description"])
-            description = (
-                (await desc_el.inner_text()).strip() if desc_el else ""
-            )
+            description = (await desc_el.inner_text()).strip() if desc_el else ""
 
-            posted_el = await page.query_selector(
-                SELECTORS["posted_date"]
-            )
-            posted_date = (
-                (await posted_el.inner_text()).strip()
-                if posted_el
-                else None
-            )
+            posted_el = await page.query_selector(SELECTORS["posted_date"])
+            posted_date = (await posted_el.inner_text()).strip() if posted_el else None
 
-            badge_els = await page.query_selector_all(
-                SELECTORS["job_type_badge"]
-            )
+            badge_els = await page.query_selector_all(SELECTORS["job_type_badge"])
             job_type = None
             for el in badge_els:
                 text = (await el.inner_text()).strip().lower()
-                if any(
-                    kw in text
-                    for kw in ("full", "part", "contract", "intern", "temp")
-                ):
+                if any(kw in text for kw in ("full", "part", "contract", "intern", "temp")):
                     job_type = text
                     break
 
@@ -348,7 +303,4 @@ class IndeedScraper(BaseScraper):
     @staticmethod
     def _extract_skills(description: str) -> List[str]:
         lower = description.lower()
-        return [
-            kw for kw in _SKILL_KEYWORDS
-            if re.search(r"\b" + re.escape(kw) + r"\b", lower)
-        ]
+        return [kw for kw in _SKILL_KEYWORDS if re.search(r"\b" + re.escape(kw) + r"\b", lower)]

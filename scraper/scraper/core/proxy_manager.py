@@ -17,7 +17,7 @@ class ProxyStrategy(str, Enum):
 
 
 class ProxyManager:
-    """Rotates proxies, tracks failures, and falls back to direct connection."""
+    """Rotates proxies, tracks failures, falls back to direct connection."""
 
     def __init__(
         self,

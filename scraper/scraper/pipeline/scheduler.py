@@ -36,7 +36,10 @@ class ScraperScheduler:
         )
         self.logger.info(
             "Scraper scheduled",
-            extra_data={"source": scraper_name, "interval_hours": interval_hours},
+            extra_data={
+                "source": scraper_name,
+                "interval_hours": interval_hours,
+            },
         )
 
     def start(self) -> None:

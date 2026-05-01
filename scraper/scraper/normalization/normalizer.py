@@ -81,7 +81,7 @@ class JobNormalizer:
             score += 1.0
         if job.experience_min_years is not None or job.experience_max_years is not None:
             score += 1.0
-        desc_len = len(job.description)
+        desc_len = len(job.description or "")
         if desc_len > 500:
             score += 1.0
         elif desc_len > 200:

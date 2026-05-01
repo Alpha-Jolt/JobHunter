@@ -1,7 +1,7 @@
 """Naukri.com scraper using Playwright + JSON-LD extraction.
 
-Search results: ItemList JSON-LD → job URLs
-Job details: JobPosting JSON-LD → full data (description, salary, company, etc.)
+Search results: ItemList JSON-LD -> job URLs
+Job details: JobPosting JSON-LD -> full data (description, salary, etc.)
 """
 
 import re
@@ -137,10 +137,15 @@ class NaukriScraper(BaseScraper):
 
             self.logger.debug(
                 "Naukri listing page",
-                extra_data={"url": url, "job_urls": len(job_urls), "page": page_num},
+                extra_data={
+                    "url": url,
+                    "job_urls": len(job_urls),
+                    "page": page_num,
+                },
             )
 
-            # Reuse the same browser context for all detail pages (avoids resource exhaustion)
+            # Reuse same browser context for all detail pages
+            # (avoids resource exhaustion)
             context = page.context
             jobs: List[IntermediateJob] = []
             for job_url in job_urls:
@@ -173,7 +178,9 @@ class NaukriScraper(BaseScraper):
         import json  # noqa: PLC0415
 
         blocks = re.findall(
-            r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
+            r'<script type="application/ld\+json">(.*?)</script>',
+            html,
+            re.DOTALL,
         )
         for block in blocks:
             try:
@@ -226,7 +233,9 @@ class NaukriScraper(BaseScraper):
         import json  # noqa: PLC0415
 
         blocks = re.findall(
-            r'<script type="application/ld\+json">(.*?)</script>', html, re.DOTALL
+            r'<script type="application/ld\+json">(.*?)</script>',
+            html,
+            re.DOTALL,
         )
         posting = None
         for block in blocks:
@@ -319,7 +328,11 @@ class NaukriScraper(BaseScraper):
                 amount = val.get("value", "")
                 unit = val.get("unitText", "")
                 currency = base.get("currency", "INR")
-                if amount and str(amount).lower() not in ("not disclosed", "not mentioned", ""):
+                if amount and str(amount).lower() not in (
+                    "not disclosed",
+                    "not mentioned",
+                    "",
+                ):
                     return f"{currency} {amount} {unit}".strip()
         # Alternate: check estimatedSalary
         est = posting.get("estimatedSalary")
@@ -342,9 +355,7 @@ class NaukriScraper(BaseScraper):
         slug = _JOB_ID_RE.sub("", slug).strip("-")
 
         exp_match = re.search(r"(\d+)-to-(\d+)-years", slug)
-        experience_raw = (
-            f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match else None
-        )
+        experience_raw = f"{exp_match.group(1)}-{exp_match.group(2)} years" if exp_match else None
 
         return IntermediateJob(
             source="naukri",

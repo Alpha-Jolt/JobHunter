@@ -32,9 +32,7 @@ _VIEWPORTS = [
 
 # Overrides Sec-Ch-Ua to hide HeadlessChrome fingerprint
 _STEALTH_HEADERS = {
-    "Sec-Ch-Ua": (
-        '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"'
-    ),
+    "Sec-Ch-Ua": ('"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"'),
     "Sec-Ch-Ua-Mobile": "?0",
     "Sec-Ch-Ua-Platform": '"Windows"',
 }
@@ -70,9 +68,7 @@ class BrowserManager:
         for i in range(self.pool_size):
             browser = await self._launch_browser()
             self._browsers.append(browser)
-            self.logger.debug(
-                "Browser initialised", extra_data={"index": i}
-            )
+            self.logger.debug("Browser initialised", extra_data={"index": i})
         self.logger.info(
             "Browser pool ready",
             extra_data={"pool_size": self.pool_size},
@@ -94,14 +90,10 @@ class BrowserManager:
     async def get_page(self, source: str) -> Page:
         """Return a new isolated page from the pool (round-robin)."""
         if not self._browsers:
-            raise RuntimeError(
-                "BrowserManager not initialised — call initialize() first"
-            )
+            raise RuntimeError("BrowserManager not initialised — call initialize() first")
 
         async with self._lock:
-            browser = self._browsers[
-                self._round_robin % len(self._browsers)
-            ]
+            browser = self._browsers[self._round_robin % len(self._browsers)]
             self._round_robin += 1
 
         import random  # noqa: PLC0415
@@ -123,24 +115,18 @@ class BrowserManager:
         self.logger.debug("Page created", extra_data={"source": source})
         return page
 
-    async def screenshot_for_debug(
-        self, page: Page, source: str, identifier: str
-    ) -> Optional[str]:
+    async def screenshot_for_debug(self, page: Page, source: str, identifier: str) -> Optional[str]:
         """Save a debug screenshot if debug_screenshots is enabled."""
         if not self.debug_screenshots:
             return None
         self.debug_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = str(
-            self.debug_dir / f"debug_{source}_{identifier}_{ts}.png"
-        )
+        path = str(self.debug_dir / f"debug_{source}_{identifier}_{ts}.png")
         try:
             await page.screenshot(path=path)
             return path
         except Exception as exc:
-            self.logger.warning(
-                "Screenshot failed", extra_data={"error": str(exc)}
-            )
+            self.logger.warning("Screenshot failed", extra_data={"error": str(exc)})
             return None
 
     async def restart_browser(self, index: int) -> None:
@@ -152,9 +138,7 @@ class BrowserManager:
         except Exception:
             pass
         self._browsers[index] = await self._launch_browser()
-        self.logger.info(
-            "Browser restarted", extra_data={"index": index}
-        )
+        self.logger.info("Browser restarted", extra_data={"index": index})
 
     async def close_all(self) -> None:
         """Close all browsers and stop Playwright."""

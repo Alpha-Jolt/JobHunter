@@ -37,13 +37,17 @@ async def run_scraper_job(
             pool_size=config.browser_pool_size,
             timeout_ms=config.scraper_timeout_ms,
         ) as bm:
-            from scraper.sources.indeed_scraper import IndeedScraper  # noqa: PLC0415
+            from scraper.sources.indeed_scraper import (  # noqa: PLC0415
+                IndeedScraper,
+            )
 
             scraper = IndeedScraper(bm, rate_limiter, retry_handler, debug=config.dev_mode)
             await pipeline.execute(scraper, keywords, locations, pages=config.pages_per_search)
 
     elif scraper_name == "naukri":
-        from scraper.sources.naukri_scraper import NaukriScraper  # noqa: PLC0415
+        from scraper.sources.naukri_scraper import (  # noqa: PLC0415
+            NaukriScraper,
+        )
 
         async with BrowserManager(
             headless=config.headless,

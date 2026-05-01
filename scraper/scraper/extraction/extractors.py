@@ -14,7 +14,8 @@ _URL_RE = re.compile(r"https?://[^\s\"'<>]+")
 _DATE_RE = re.compile(
     r"\b(?:\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}"
     r"|\d{4}[\/\-]\d{2}[\/\-]\d{2}"
-    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4})\b",
+    r"|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+    r"[a-z]*\.?\s+\d{1,2},?\s+\d{4})\b",
     re.IGNORECASE,
 )
 

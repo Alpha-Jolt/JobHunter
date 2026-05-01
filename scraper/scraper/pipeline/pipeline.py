@@ -78,9 +78,7 @@ class ScraperPipeline:
         try:
             with timer("pipeline_duration_seconds"):
                 # Stage 1 — Scrape
-                raw_jobs = await self._scrape(
-                    scraper, keywords, locations, scraper_kwargs
-                )
+                raw_jobs = await self._scrape(scraper, keywords, locations, scraper_kwargs)
                 result.raw_jobs_count = len(raw_jobs)
                 Metrics.counter("total_jobs_scraped").inc(len(raw_jobs))
 
@@ -93,13 +91,10 @@ class ScraperPipeline:
                 result.normalized_jobs_count = len(canonical_jobs)
 
                 # Stage 4 — Deduplicate
-                unique_jobs, dedup_report = self.deduplicator.deduplicate(
-                    canonical_jobs
-                )
+                unique_jobs, dedup_report = self.deduplicator.deduplicate(canonical_jobs)
                 result.final_jobs_count = len(unique_jobs)
-                result.duplicates_removed = (
-                    dedup_report.get("total", 0)
-                    - dedup_report.get("unique", 0)
+                result.duplicates_removed = dedup_report.get("total", 0) - dedup_report.get(
+                    "unique", 0
                 )
                 result.jobs = unique_jobs
 

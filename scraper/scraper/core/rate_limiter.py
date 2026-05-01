@@ -41,7 +41,7 @@ class RateLimiter:
         self.logger = Logger.get_logger(__name__)
 
     def set_rate(self, domain: str, requests_per_second: float) -> None:
-        """Configure rate for a domain. Capacity = 2× rate (burst allowance)."""
+        """Configure rate for a domain (capacity = 2x rate for burst)."""
         capacity = requests_per_second * 2
         self._buckets[domain] = _TokenBucket(capacity, requests_per_second)
         self.logger.debug(
