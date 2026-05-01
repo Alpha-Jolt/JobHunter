@@ -1,5 +1,9 @@
-"""Main pipeline orchestrator — scrape → clean → normalize → deduplicate → output."""
+"""Main pipeline orchestrator.
 
+Stages: scrape → clean → normalize → deduplicate → output.
+"""
+
+import asyncio
 import time
 from dataclasses import dataclass, field
 from typing import List
@@ -69,29 +73,53 @@ class ScraperPipeline:
             locations=locations,
         )
         start = time.monotonic()
+        raw_jobs: List[IntermediateJob] = []
 
-        with timer("pipeline_duration_seconds"):
-            # Stage 1 — Scrape
-            raw_jobs = await self._scrape(scraper, keywords, locations, scraper_kwargs)
-            result.raw_jobs_count = len(raw_jobs)
-            Metrics.counter("total_jobs_scraped").inc(len(raw_jobs))
+        try:
+            with timer("pipeline_duration_seconds"):
+                # Stage 1 — Scrape
+                raw_jobs = await self._scrape(
+                    scraper, keywords, locations, scraper_kwargs
+                )
+                result.raw_jobs_count = len(raw_jobs)
+                Metrics.counter("total_jobs_scraped").inc(len(raw_jobs))
 
-            # Stage 2 — Clean
-            cleaned_jobs = await self._clean(raw_jobs, result)
-            result.cleaned_jobs_count = len(cleaned_jobs)
+                # Stage 2 — Clean
+                cleaned_jobs = await self._clean(raw_jobs, result)
+                result.cleaned_jobs_count = len(cleaned_jobs)
 
-            # Stage 3 — Normalize
-            canonical_jobs = self._normalize(cleaned_jobs, result)
-            result.normalized_jobs_count = len(canonical_jobs)
+                # Stage 3 — Normalize
+                canonical_jobs = self._normalize(cleaned_jobs, result)
+                result.normalized_jobs_count = len(canonical_jobs)
 
-            # Stage 4 — Deduplicate
-            unique_jobs, dedup_report = self.deduplicator.deduplicate(canonical_jobs)
-            result.final_jobs_count = len(unique_jobs)
-            result.duplicates_removed = dedup_report.get("total", 0) - dedup_report.get("unique", 0)
-            result.jobs = unique_jobs
+                # Stage 4 — Deduplicate
+                unique_jobs, dedup_report = self.deduplicator.deduplicate(
+                    canonical_jobs
+                )
+                result.final_jobs_count = len(unique_jobs)
+                result.duplicates_removed = (
+                    dedup_report.get("total", 0)
+                    - dedup_report.get("unique", 0)
+                )
+                result.jobs = unique_jobs
 
-            # Stage 5 — Output
-            await self._output(unique_jobs)
+                # Stage 5 — Output
+                await self._output(unique_jobs)
+
+        except asyncio.CancelledError:
+            # Flush whatever was scraped before cancellation
+            if raw_jobs:
+                self.logger.warning(
+                    "Pipeline cancelled — flushing partial results",
+                    extra_data={"partial_raw": len(raw_jobs)},
+                )
+                cleaned = await self._clean(raw_jobs, result)
+                canonical = self._normalize(cleaned, result)
+                unique, _ = self.deduplicator.deduplicate(canonical)
+                result.jobs = unique
+                result.final_jobs_count = len(unique)
+                await self._output(unique)
+            raise
 
         result.duration_seconds = round(time.monotonic() - start, 2)
         self.logger.info(

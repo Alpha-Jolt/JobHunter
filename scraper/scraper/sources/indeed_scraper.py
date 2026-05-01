@@ -18,12 +18,12 @@ BASE_URL = "https://in.indeed.com/jobs"
 DOMAIN = "in.indeed.com"
 
 SELECTORS: Dict[str, str] = {
-    "job_cards": '[id^="p_"]',
+    "job_cards": ".job_seen_beacon",
     "job_link": "a[data-jk]",
     "job_title": ".jobTitle span",
-    "company_name": '[data-company-name="true"]',
+    "company_name": '[data-testid="company-name"]',
     "location": '[data-testid="text-location"]',
-    "salary": '[data-testid="attribute_snippet_testid"]',
+    "salary": ".salary-snippet-container",
     "description": "#jobDescriptionText",
     "job_type_badge": '[data-testid="attribute_snippet_testid"]',
     "posted_date": '[data-testid="myJobsStateDate"]',
@@ -59,6 +59,9 @@ _SKILL_KEYWORDS = [
     "power bi",
     "tableau",
 ]
+
+_CF_WAIT_MS = 3_000
+_CF_MAX_POLLS = 5
 
 
 class IndeedScraper(BaseScraper):
@@ -104,12 +107,20 @@ class IndeedScraper(BaseScraper):
                     results.extend(jobs)
                     self.logger.info(
                         "Keyword-location done",
-                        extra_data={"keyword": keyword, "location": location, "count": len(jobs)},
+                        extra_data={
+                            "keyword": keyword,
+                            "location": location,
+                            "count": len(jobs),
+                        },
                     )
                 except Exception as exc:
                     self.logger.error(
                         "Keyword-location failed",
-                        extra_data={"keyword": keyword, "location": location, "error": str(exc)},
+                        extra_data={
+                            "keyword": keyword,
+                            "location": location,
+                            "error": str(exc),
+                        },
                         exc_info=True,
                     )
         return results
@@ -126,28 +137,43 @@ class IndeedScraper(BaseScraper):
                 break  # No more results
         return jobs
 
-    async def _scrape_page(self, keyword: str, location: str, offset: int) -> List[IntermediateJob]:
-        url = f"{BASE_URL}?q={quote_plus(keyword)}&l={quote_plus(location)}&start={offset}"
+    async def _scrape_page(
+        self, keyword: str, location: str, offset: int
+    ) -> List[IntermediateJob]:
+        url = (
+            f"{BASE_URL}"
+            f"?q={quote_plus(keyword)}"
+            f"&l={quote_plus(location)}"
+            f"&start={offset}"
+        )
         await self.rate_limiter.acquire(DOMAIN)
 
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(url, timeout=30_000)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=12_000)
-            except Exception:
-                pass
-            await page.wait_for_timeout(3_000)
-
-            # Detect Cloudflare block
-            title = await page.title()
-            if "just a moment" in title.lower():
+            await page.goto(
+                url, timeout=30_000, wait_until="domcontentloaded"
+            )
+            # Wait for Cloudflare challenge to resolve (up to 15 s)
+            for _ in range(_CF_MAX_POLLS):
+                title = await page.title()
+                if "just a moment" not in title.lower():
+                    break
+                await page.wait_for_timeout(_CF_WAIT_MS)
+            else:
                 self.logger.warning(
                     "Indeed blocked by Cloudflare",
                     extra_data={"url": url},
                 )
                 return []
+
+            try:
+                await page.wait_for_load_state(
+                    "networkidle", timeout=10_000
+                )
+            except Exception:
+                pass
+            await page.wait_for_timeout(2_000)
 
             await self._scroll_to_load_jobs(page)
 
@@ -163,7 +189,10 @@ class IndeedScraper(BaseScraper):
                     if job:
                         jobs.append(job)
                 except Exception as exc:
-                    self.logger.warning("Card extraction failed", extra_data={"error": str(exc)})
+                    self.logger.warning(
+                        "Card extraction failed",
+                        extra_data={"error": str(exc)},
+                    )
 
             return jobs
         except PlaywrightTimeout:
@@ -173,7 +202,9 @@ class IndeedScraper(BaseScraper):
             if page:
                 await page.context.close()
 
-    async def _extract_job_from_card(self, list_page: Page, card) -> Optional[IntermediateJob]:
+    async def _extract_job_from_card(
+        self, list_page: Page, card
+    ) -> Optional[IntermediateJob]:
         start = time.monotonic()
 
         link_el = await card.query_selector(SELECTORS["job_link"])
@@ -187,20 +218,30 @@ class IndeedScraper(BaseScraper):
         job_url = f"https://in.indeed.com/viewjob?jk={job_key}"
 
         title_el = await card.query_selector(SELECTORS["job_title"])
-        title = (await title_el.inner_text()).strip() if title_el else None
+        title = (
+            (await title_el.inner_text()).strip() if title_el else None
+        )
 
         company_el = await card.query_selector(SELECTORS["company_name"])
-        company = (await company_el.inner_text()).strip() if company_el else None
+        company = (
+            (await company_el.inner_text()).strip()
+            if company_el
+            else None
+        )
 
         location_el = await card.query_selector(SELECTORS["location"])
-        location = (await location_el.inner_text()).strip() if location_el else None
+        location = (
+            (await location_el.inner_text()).strip()
+            if location_el
+            else None
+        )
 
         salary_el = await card.query_selector(SELECTORS["salary"])
-        salary = (await salary_el.inner_text()).strip() if salary_el else None
+        salary = (
+            (await salary_el.inner_text()).strip() if salary_el else None
+        )
 
-        # Fetch full details
         details = await self._get_full_job_details(job_url)
-
         duration_ms = (time.monotonic() - start) * 1000
 
         return IntermediateJob(
@@ -211,9 +252,15 @@ class IndeedScraper(BaseScraper):
             company_name=company,
             location_raw=location,
             salary_raw=salary,
-            description=details.get("description") if details else None,
-            job_type_raw=details.get("job_type") if details else None,
-            posted_date_raw=details.get("posted_date") if details else None,
+            description=(
+                details.get("description") if details else None
+            ),
+            job_type_raw=(
+                details.get("job_type") if details else None
+            ),
+            posted_date_raw=(
+                details.get("posted_date") if details else None
+            ),
             apply_url=job_url,
             skills_required_raw=self._extract_skills(
                 details.get("description", "") if details else ""
@@ -223,37 +270,65 @@ class IndeedScraper(BaseScraper):
             extraction_source="html_parser",
         )
 
-    async def _get_full_job_details(self, job_url: str) -> Optional[Dict]:
+    async def _get_full_job_details(
+        self, job_url: str
+    ) -> Optional[Dict]:
         await self.rate_limiter.acquire(DOMAIN)
         page: Optional[Page] = None
         try:
             page = await self.browser_manager.get_page("indeed")
-            await page.goto(job_url, timeout=30_000)
-            try:
-                await page.wait_for_load_state("networkidle", timeout=12_000)
-            except Exception:
-                pass
-            await page.wait_for_timeout(2_000)
-
-            title = await page.title()
-            if "just a moment" in title.lower():
+            await page.goto(
+                job_url, timeout=30_000, wait_until="domcontentloaded"
+            )
+            # Wait for Cloudflare challenge to resolve (up to 12 s)
+            for _ in range(_CF_MAX_POLLS - 1):
+                title = await page.title()
+                if "just a moment" not in title.lower():
+                    break
+                await page.wait_for_timeout(_CF_WAIT_MS)
+            else:
                 return None
 
+            try:
+                await page.wait_for_load_state(
+                    "networkidle", timeout=10_000
+                )
+            except Exception:
+                pass
+            await page.wait_for_timeout(1_500)
+
             desc_el = await page.query_selector(SELECTORS["description"])
-            description = (await desc_el.inner_text()).strip() if desc_el else ""
+            description = (
+                (await desc_el.inner_text()).strip() if desc_el else ""
+            )
 
-            posted_el = await page.query_selector(SELECTORS["posted_date"])
-            posted_date = (await posted_el.inner_text()).strip() if posted_el else None
+            posted_el = await page.query_selector(
+                SELECTORS["posted_date"]
+            )
+            posted_date = (
+                (await posted_el.inner_text()).strip()
+                if posted_el
+                else None
+            )
 
-            badge_els = await page.query_selector_all(SELECTORS["job_type_badge"])
+            badge_els = await page.query_selector_all(
+                SELECTORS["job_type_badge"]
+            )
             job_type = None
             for el in badge_els:
                 text = (await el.inner_text()).strip().lower()
-                if any(kw in text for kw in ("full", "part", "contract", "intern", "temp")):
+                if any(
+                    kw in text
+                    for kw in ("full", "part", "contract", "intern", "temp")
+                ):
                     job_type = text
                     break
 
-            return {"description": description, "posted_date": posted_date, "job_type": job_type}
+            return {
+                "description": description,
+                "posted_date": posted_date,
+                "job_type": job_type,
+            }
         except Exception as exc:
             self.logger.warning(
                 "Detail fetch failed",
@@ -273,4 +348,7 @@ class IndeedScraper(BaseScraper):
     @staticmethod
     def _extract_skills(description: str) -> List[str]:
         lower = description.lower()
-        return [kw for kw in _SKILL_KEYWORDS if re.search(r"\b" + re.escape(kw) + r"\b", lower)]
+        return [
+            kw for kw in _SKILL_KEYWORDS
+            if re.search(r"\b" + re.escape(kw) + r"\b", lower)
+        ]

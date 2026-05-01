@@ -1,19 +1,21 @@
-"""Playwright browser lifecycle management with pooling and stealth mode."""
+"""Playwright browser lifecycle management with pooling and stealth."""
 
 import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    async_playwright,
+)
+from playwright_stealth import Stealth
 
 from scraper.logging_.logger import Logger
 
-_STEALTH_JS = """
-Object.defineProperty(navigator, 'webdriver', { get: () => false });
-Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-"""
+_STEALTH = Stealth()
 
 _USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -28,9 +30,18 @@ _VIEWPORTS = [
     {"width": 1366, "height": 768},
 ]
 
+# Overrides Sec-Ch-Ua to hide HeadlessChrome fingerprint
+_STEALTH_HEADERS = {
+    "Sec-Ch-Ua": (
+        '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"'
+    ),
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+}
+
 
 class BrowserManager:
-    """Manages a pool of Playwright Chromium browsers with stealth and isolation."""
+    """Manages a pool of Playwright Chromium browsers with stealth."""
 
     def __init__(
         self,
@@ -59,8 +70,13 @@ class BrowserManager:
         for i in range(self.pool_size):
             browser = await self._launch_browser()
             self._browsers.append(browser)
-            self.logger.debug("Browser initialised", extra_data={"index": i})
-        self.logger.info("Browser pool ready", extra_data={"pool_size": self.pool_size})
+            self.logger.debug(
+                "Browser initialised", extra_data={"index": i}
+            )
+        self.logger.info(
+            "Browser pool ready",
+            extra_data={"pool_size": self.pool_size},
+        )
 
     async def _launch_browser(self) -> Browser:
         return await self._playwright.chromium.launch(
@@ -78,10 +94,14 @@ class BrowserManager:
     async def get_page(self, source: str) -> Page:
         """Return a new isolated page from the pool (round-robin)."""
         if not self._browsers:
-            raise RuntimeError("BrowserManager not initialised — call initialize() first")
+            raise RuntimeError(
+                "BrowserManager not initialised — call initialize() first"
+            )
 
         async with self._lock:
-            browser = self._browsers[self._round_robin % len(self._browsers)]
+            browser = self._browsers[
+                self._round_robin % len(self._browsers)
+            ]
             self._round_robin += 1
 
         import random  # noqa: PLC0415
@@ -92,34 +112,35 @@ class BrowserManager:
         context: BrowserContext = await browser.new_context(
             viewport=viewport,
             user_agent=user_agent,
-            # Override Sec-Ch-Ua to hide HeadlessChrome fingerprint
-            extra_http_headers={
-                "Sec-Ch-Ua": '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
-                "Sec-Ch-Ua-Mobile": "?0",
-                "Sec-Ch-Ua-Platform": '"Windows"',
-            },
+            extra_http_headers=_STEALTH_HEADERS,
         )
+        if self.enable_stealth:
+            await _STEALTH.apply_stealth_async(context)
+
         page = await context.new_page()
         page.set_default_timeout(self.timeout_ms)
-
-        if self.enable_stealth:
-            await page.add_init_script(_STEALTH_JS)
 
         self.logger.debug("Page created", extra_data={"source": source})
         return page
 
-    async def screenshot_for_debug(self, page: Page, source: str, identifier: str) -> Optional[str]:
+    async def screenshot_for_debug(
+        self, page: Page, source: str, identifier: str
+    ) -> Optional[str]:
         """Save a debug screenshot if debug_screenshots is enabled."""
         if not self.debug_screenshots:
             return None
         self.debug_dir.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = str(self.debug_dir / f"debug_{source}_{identifier}_{ts}.png")
+        path = str(
+            self.debug_dir / f"debug_{source}_{identifier}_{ts}.png"
+        )
         try:
             await page.screenshot(path=path)
             return path
         except Exception as exc:
-            self.logger.warning("Screenshot failed", extra_data={"error": str(exc)})
+            self.logger.warning(
+                "Screenshot failed", extra_data={"error": str(exc)}
+            )
             return None
 
     async def restart_browser(self, index: int) -> None:
@@ -131,7 +152,9 @@ class BrowserManager:
         except Exception:
             pass
         self._browsers[index] = await self._launch_browser()
-        self.logger.info("Browser restarted", extra_data={"index": index})
+        self.logger.info(
+            "Browser restarted", extra_data={"index": index}
+        )
 
     async def close_all(self) -> None:
         """Close all browsers and stop Playwright."""
@@ -139,10 +162,17 @@ class BrowserManager:
             try:
                 await browser.close()
             except Exception as exc:
-                self.logger.error("Error closing browser", extra_data={"error": str(exc)})
+                self.logger.error(
+                    "Error closing browser",
+                    extra_data={"error": str(exc)},
+                )
         self._browsers.clear()
         if self._playwright:
-            await self._playwright.stop()
+            try:
+                await self._playwright.stop()
+            except Exception:
+                # Suppress errors when the event loop is shutting down
+                pass
         self.logger.info("All browsers closed")
 
     async def __aenter__(self) -> "BrowserManager":
