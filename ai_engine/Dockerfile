@@ -8,12 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ai_engine/requirements.txt ./ai_engine/requirements.txt
-COPY shared/requirements.txt ./shared/requirements.txt
 
-RUN pip install --no-cache-dir -r ai_engine/requirements.txt \
-    && pip install --no-cache-dir -r shared/requirements.txt
+RUN pip install --no-cache-dir -r ai_engine/requirements.txt
 
-COPY shared/ ./shared/
 COPY ai_engine/ ./ai_engine/
 
 RUN mkdir -p ai_output registries

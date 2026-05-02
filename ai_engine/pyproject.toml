@@ -1,6 +1,6 @@
 [project]
 name = "ai_engine"
-version = "0.0.1"
+version = "0.1.0"
 description = "JobHunter AI Engine - Phase 0 MVP"
 requires-python = ">=3.10"
 readme = "README.md"
