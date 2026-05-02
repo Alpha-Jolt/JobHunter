@@ -70,6 +70,26 @@ Copy `.env.example` to `.env` and adjust values. All settings have sensible defa
 | `OUTPUT_FORMATS` | `json,csv` | Output file formats |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `PROXY_LIST` | _(empty)_ | Comma-separated proxy URLs |
+| `USE_REGISTRY` | `false` | Persist jobs to shared `JobRegistry` |
+| `REGISTRY_PATH` | `registries/jobs.json` | Path to the registry JSON file |
+
+## Registry output
+
+When `USE_REGISTRY=true`, the pipeline writes deduplicated jobs to the shared `JobRegistry`
+in addition to the normal JSON/CSV files. The registry file is created automatically.
+
+```bash
+USE_REGISTRY=true python -m dev_mode.dev_runner
+```
+
+Or in code:
+
+```python
+from scraper.config import Config
+from scraper.pipeline.pipeline import ScraperPipeline
+
+pipeline = ScraperPipeline(Config(use_registry=True))
+```
 
 ## Running specific scrapers
 

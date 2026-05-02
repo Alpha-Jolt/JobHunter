@@ -195,6 +195,31 @@ registry = PostgresJobRepository(session=db_session)
 
 ---
 
+## Engine Integration
+
+### Scraper → JobRegistry
+
+The scraper writes deduplicated jobs via `RegistryOutput`, a `BaseOutput` adapter.
+Enable it with `USE_REGISTRY=true` in `scraper/.env` or `Config(use_registry=True)` in code.
+The registry file defaults to `registries/jobs.json` (configurable via `REGISTRY_PATH`).
+
+```python
+# scraper/scraper/output/registry_output.py
+from shared.registries.job_registry import JobRegistry
+registry = JobRegistry()  # reads/writes registries/jobs.json
+await registry.save(job_records)  # called automatically by the pipeline
+```
+
+### AI Engine → JobRegistry + VariantRegistry _(Phase 0+)_
+
+Reads `"raw"` jobs from `JobRegistry`, generates variants, saves them to `VariantRegistry` with `status="pending"`.
+
+### Mail Engine → VariantRegistry + ApplicationLog _(Phase 0+)_
+
+Reads approved variants via `get_approved_for_job()`, checks `has_user_applied_to_job()`, then calls `record_send()`.
+
+---
+
 ## Troubleshooting
 
 **`DeserializationError` on `from_dict()`** — A required field is missing or a UUID/enum value is invalid. Check the `context` dict on the exception for the offending data.
