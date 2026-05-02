@@ -18,16 +18,17 @@ exclude = '''
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["scraper/tests", "shared/tests"]
+testpaths = ["scraper/tests", "shared/tests", "ai_engine/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=scraper --cov=shared --cov-report=term-missing"
+addopts = "--cov=scraper --cov=shared --cov=ai_engine --cov-report=term-missing"
 
 [tool.coverage.run]
 omit = [
     ".venv/*",
     "scraper/.venv/*",
+    "ai_engine/.venv/*",
     "*/tests/*",
 ]
 

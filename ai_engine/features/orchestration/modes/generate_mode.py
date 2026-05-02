@@ -43,10 +43,19 @@ async def run_generate_mode(
     variant_ids: list[str] = []
 
     # Ingest jobs
-    scraper_files = list(config.scraper_output_dir.glob("*.csv")) + list(
-        config.scraper_output_dir.glob("*.json")
-    )
-    jobs, summary = await ingest_jobs(scraper_files)
+    if getattr(config, "use_shared_registry", False):
+        from ai_engine.features.ingestion.readers.registry_reader import (  # noqa: PLC0415
+            read_registry,
+        )
+
+        registry_path = getattr(config, "shared_jobs_registry_path", "registries/jobs.json")
+        jobs = read_registry(registry_path)
+        summary = None
+    else:
+        scraper_files = list(config.scraper_output_dir.glob("*.csv")) + list(
+            config.scraper_output_dir.glob("*.json")
+        )
+        jobs, summary = await ingest_jobs(scraper_files)
 
     if config.job_ids_to_process:
         jobs = [j for j in jobs if j.job_id in config.job_ids_to_process]
@@ -104,6 +113,7 @@ async def run_generate_mode(
         execution_summary=(
             f"Generated {len(variant_ids)} variants. "
             f"{len(errors)} jobs failed. "
-            f"Budget remaining: {summary.valid_records - len(variant_ids)} slots."
+            f"Budget remaining: "
+            f"{(summary.valid_records if summary else len(jobs)) - len(variant_ids)} slots."
         ),
     )

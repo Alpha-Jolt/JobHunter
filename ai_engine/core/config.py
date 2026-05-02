@@ -44,6 +44,13 @@ class PathSettings(BaseSettings):
     ai_output_dir: Path = Path("ai_output")
     prompts_dir: Path = Path("ai_engine/features/llm/prompting/prompts")
     variant_registry_path: Path = Path("ai_output/variant_registry.json")
+    use_shared_registry: bool = Field(default=False, alias="USE_SHARED_REGISTRY")
+    shared_jobs_registry_path: str = Field(
+        default="registries/jobs.json", alias="SHARED_JOBS_REGISTRY_PATH"
+    )
+    shared_variants_registry_path: str = Field(
+        default="registries/variants.json", alias="SHARED_VARIANTS_REGISTRY_PATH"
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 

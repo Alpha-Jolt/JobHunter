@@ -31,8 +31,8 @@ pip install -e ".[dev]"
 ## Docker
 
 ```bash
-cd docker
-docker compose up --build
+# From the project root
+docker compose -f DOCKER-COMPOSE.yml up --build scraper admin_dashboard data_collector redis
 # scraper on dev_runner, admin on :8001, data collector on :8002
 ```
 

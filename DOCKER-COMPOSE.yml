@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    volumes:
+      - ./scraper/output:/app/output
+      - ./scraper/logs:/app/logs
+      - ./registries:/app/registries
+    depends_on:
+      - redis
+
+  admin_dashboard:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    command: ["uvicorn", "admin_dashboard.app:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./scraper/output:/app/output
+      - ./scraper/logs:/app/logs
+    depends_on:
+      - redis
+
+  data_collector:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    command: ["uvicorn", "data_collector_ui.app:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+    depends_on:
+      - redis
+
+  ai_engine:
+    build:
+      context: .
+      dockerfile: ai_engine/Dockerfile
+    env_file:
+      - ./ai_engine/.env
+    volumes:
+      - ./ai_output:/app/ai_output
+      - ./registries:/app/registries
+      - ./scraper/output:/app/output
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

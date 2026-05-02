@@ -210,9 +210,11 @@ registry = JobRegistry()  # reads/writes registries/jobs.json
 await registry.save(job_records)  # called automatically by the pipeline
 ```
 
-### AI Engine → JobRegistry + VariantRegistry _(Phase 0+)_
+### AI Engine → JobRegistry + VariantRegistry
 
-Reads `"raw"` jobs from `JobRegistry`, generates variants, saves them to `VariantRegistry` with `status="pending"`.
+Reads `"raw"` jobs from `JobRegistry` via `registry_reader.py`, generates variants,
+and saves them to `VariantRegistry` via `SharedVariantRegistry` adapter.
+Enable with `USE_SHARED_REGISTRY=true` in `ai_engine/.env`.
 
 ### Mail Engine → VariantRegistry + ApplicationLog _(Phase 0+)_
 

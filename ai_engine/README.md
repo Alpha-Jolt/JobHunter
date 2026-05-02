@@ -70,12 +70,51 @@ Copy `ai_engine/.env.example` to `.env` and set at minimum one provider key.
 | `MAX_VARIANTS_TOTAL` | `50` | Hard global variant cap |
 | `MAX_VARIANTS_PER_SESSION` | `10` | Per-session cap |
 | `LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` |
+| `USE_SHARED_REGISTRY` | `false` | Read jobs from / write variants to `shared` registries |
+| `SHARED_JOBS_REGISTRY_PATH` | `registries/jobs.json` | Path to shared jobs registry |
+| `SHARED_VARIANTS_REGISTRY_PATH` | `registries/variants.json` | Path to shared variants registry |
 
 ---
 
 ## Supported LLM Providers
 
 Anthropic (claude-sonnet-4-5), OpenAI (gpt-4o-mini), Gemini (gemini-2.0-flash), DeepSeek (deepseek-chat), Grok (grok-3), OpenRouter (configurable model).
+
+---
+
+## Docker
+
+```bash
+# From the project root
+docker compose -f DOCKER-COMPOSE.yml up --build ai_engine
+```
+
+The container loads configuration from `ai_engine/.env`. Copy `ai_engine/.env.example` to `ai_engine/.env` and set at least one LLM provider key before building.
+
+---
+
+## Shared Registry Integration
+
+When `USE_SHARED_REGISTRY=true`, the AI Engine reads jobs from `shared.JobRegistry`
+instead of CSV/JSON files, and writes variants to `shared.VariantRegistry` instead of
+its internal JSON registry. Both integrations are off by default.
+
+```bash
+USE_SHARED_REGISTRY=true python -m ai_engine.features.orchestration.pipeline
+```
+
+Or in code:
+
+```python
+from ai_engine.features.orchestration.models.pipeline_config import PipelineConfig
+
+config = PipelineConfig(
+    resume_file_path="resume.pdf",
+    user_id="user-123",
+    session_id="session-001",
+    use_shared_registry=True,
+)
+```
 
 ---
 
