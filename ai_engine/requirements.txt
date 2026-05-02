@@ -27,4 +27,4 @@ black==24.4.2
 flake8==7.0.0
 
 # DPL Shared Utility
-jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.1.0
+jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.1.1
