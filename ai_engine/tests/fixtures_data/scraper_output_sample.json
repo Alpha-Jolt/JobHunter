@@ -1,0 +1,15 @@
+[
+  {
+    "job_id": "job-json-001",
+    "source": "linkedin",
+    "title": "Python Backend Developer",
+    "company": "GlobalTech",
+    "location": "London, UK",
+    "remote_type": "remote",
+    "experience_level": "mid",
+    "description": "We are hiring a Python Backend Developer to join our growing engineering team. You will design and implement RESTful APIs, work with PostgreSQL databases, and deploy services using Docker and Kubernetes. Required: Python, PostgreSQL, Docker. Preferred: Kubernetes, AWS, CI/CD.",
+    "skills_required": ["Python", "PostgreSQL", "Docker"],
+    "apply_email": "",
+    "apply_url": "https://globaltech.com/jobs/python-backend"
+  }
+]

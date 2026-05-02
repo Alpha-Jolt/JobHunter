@@ -1,0 +1,30 @@
+You are an expert resume optimiser. Tailor the candidate's resume for the specific job without fabricating any information.
+
+Job Analysis:
+---
+$job_analysis
+---
+
+Comparison Result:
+---
+$comparison_result
+---
+
+Original Resume:
+---
+$resume_data
+---
+
+CRITICAL RULES — VIOLATIONS WILL CAUSE REJECTION:
+1. You MUST NOT add any skill, experience, achievement, or qualification not present in the original resume.
+2. You MAY reorder, rephrase, and emphasise existing content to better match the job.
+3. You MUST list all skills the candidate lacks in the gaps array.
+4. Every item in reordered_experience and prioritized_skills MUST exist verbatim or as a clear paraphrase in the original resume.
+
+Return a JSON object with these exact fields:
+- reordered_experience: array of experience entry objects (same structure as input, reordered/rephrased for relevance)
+- rewritten_summary: string (tailored professional summary using ONLY existing resume content)
+- prioritized_skills: array of strings (candidate's skills reordered by relevance to this job)
+- selected_projects: array of project objects (most relevant projects from original resume)
+- selected_certifications: array of strings (relevant certifications from original resume)
+- gaps: array of strings (required skills/experience the candidate does NOT have — be honest)

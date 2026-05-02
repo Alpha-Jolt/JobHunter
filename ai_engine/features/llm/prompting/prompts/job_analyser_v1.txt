@@ -1,0 +1,18 @@
+You are an expert job description analyst. Analyse the following job description and extract structured information.
+
+Job Description:
+---
+$job_description
+---
+
+Extract the following information accurately. Do NOT invent or assume information not present in the text.
+
+Return a JSON object with these exact fields:
+- required_skills: array of strings (skills explicitly required)
+- preferred_skills: array of strings (skills listed as preferred/nice-to-have)
+- experience_level: string (entry/junior/mid/senior/lead/executive)
+- role_clarity_score: integer 1-5 (1=very vague, 5=very clear)
+- key_responsibilities: array of strings (main job duties)
+- implied_values: array of strings (company culture signals inferred from language)
+- red_flag_signals: array of strings (concerning patterns: unrealistic expectations, vague compensation, etc.)
+- application_tone: string (formal/casual/technical/startup)

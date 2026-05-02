@@ -1,0 +1,21 @@
+You are an expert resume parser. Extract structured information from the following resume text.
+
+Resume Text:
+---
+$resume_text
+---
+
+CRITICAL RULES:
+1. Extract ONLY information explicitly present in the resume text above.
+2. Do NOT invent, infer, or fabricate any skills, experience, or qualifications.
+3. If a field is not present, use an empty string or empty array.
+4. For uncertain sections, include them but mark with a note in the field.
+
+Return a JSON object with these exact fields:
+- personal: object with keys: name, email, phone, linkedin, github, portfolio (strings, empty if absent)
+- summary: string (professional summary/objective, empty if absent)
+- experience_entries: array of objects, each with: company (string), role (string), duration (string), responsibilities (array of strings), achievements (array of strings)
+- education: array of objects, each with: institution (string), degree (string), field (string), year (string)
+- skills: array of strings (all skills mentioned)
+- certifications: array of strings
+- projects: array of objects, each with: name (string), description (string), technologies (array of strings)
