@@ -19,6 +19,7 @@ from scraper.normalization.normalizer import JobNormalizer
 from scraper.output.base_output import BaseOutput
 from scraper.output.csv_output import CSVOutput
 from scraper.output.json_output import JSONOutput
+from scraper.output.registry_output import RegistryOutput
 from scraper.sources.base_scraper import BaseScraper
 
 
@@ -57,6 +58,10 @@ class ScraperPipeline:
             outputs.append(JSONOutput(self.config.output_dir))
         if "csv" in formats:
             outputs.append(CSVOutput(self.config.output_dir))
+        if self.config.use_registry:
+            from shared.registries.job_registry import JobRegistry
+
+            outputs.append(RegistryOutput(JobRegistry(self.config.registry_path)))
         return outputs
 
     async def execute(

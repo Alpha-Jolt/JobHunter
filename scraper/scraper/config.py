@@ -53,6 +53,8 @@ class Config(BaseSettings):
     # --- Output ---
     output_dir: Path = Path("output")
     output_formats: str = "json,csv"
+    use_registry: bool = False
+    registry_path: str = "registries/jobs.json"
 
     @field_validator("log_level")
     @classmethod
