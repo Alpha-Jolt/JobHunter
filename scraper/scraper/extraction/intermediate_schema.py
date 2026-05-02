@@ -1,6 +1,6 @@
 """Intermediate (raw extracted) job schema — preserves original values."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -32,6 +32,6 @@ class IntermediateJob(BaseModel):
     apply_email_raw: Optional[str] = None
 
     # Extraction metadata
-    extraction_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    extraction_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     extraction_duration_ms: float = 0.0
     extraction_source: str = "html_parser"  # 'html_parser' | 'json_api'

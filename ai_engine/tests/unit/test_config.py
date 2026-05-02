@@ -21,7 +21,7 @@ def test_llm_settings_default_provider():
 
 
 def test_variant_settings_defaults():
-    """Variant budget defaults are sensible."""
+    """Variant budget matches configured .env values."""
     settings = Settings()
-    assert settings.variants.max_variants_total == 50
-    assert settings.variants.max_variants_per_session == 10
+    assert settings.variants.max_variants_total == 15
+    assert settings.variants.max_variants_per_session == 5

@@ -1,7 +1,7 @@
 """Map CleanedJob → CanonicalJob with scoring and hashing."""
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from scraper.cleaning.cleaner_pipeline import CleanedJob
@@ -33,7 +33,10 @@ class JobNormalizer:
 
         posted_days_ago: Optional[int] = None
         if job.posted_date:
-            delta = datetime.utcnow() - job.posted_date
+            posted = job.posted_date
+            if posted.tzinfo is None:
+                posted = posted.replace(tzinfo=timezone.utc)
+            delta = datetime.now(timezone.utc) - posted
             posted_days_ago = max(0, delta.days)
 
         completeness = self._calculate_completeness(job)

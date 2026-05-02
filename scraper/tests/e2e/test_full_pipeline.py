@@ -1,6 +1,6 @@
 """E2E test — full pipeline with mock data (no live network calls)."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -36,7 +36,7 @@ class _MockScraper(BaseScraper):
                 posted_date_raw="2 days ago",
                 skills_required_raw=["Python", "Django"],
                 apply_url=f"https://mock.com/apply/{i}",
-                extraction_timestamp=datetime.utcnow(),
+                extraction_timestamp=datetime.now(timezone.utc),
             )
             for i in range(10)
         ]

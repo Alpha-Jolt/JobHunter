@@ -2,7 +2,7 @@
 
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from urllib.parse import quote_plus
 
@@ -239,7 +239,7 @@ class IndeedScraper(BaseScraper):
             skills_required_raw=self._extract_skills(
                 details.get("description", "") if details else ""
             ),
-            extraction_timestamp=datetime.utcnow(),
+            extraction_timestamp=datetime.now(timezone.utc),
             extraction_duration_ms=duration_ms,
             extraction_source="html_parser",
         )

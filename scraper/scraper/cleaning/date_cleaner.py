@@ -1,7 +1,7 @@
 """Date string parsing to datetime objects."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 _RELATIVE_RE = re.compile(
@@ -44,7 +44,7 @@ class DateCleaner:
             return None
         text = date_str.strip().lower()
         if text in ("just now", "today", "moments ago"):
-            return datetime.utcnow()
+            return datetime.now(timezone.utc)
         result = DateCleaner._parse_relative_date(text)
         if result:
             return result
@@ -59,7 +59,7 @@ class DateCleaner:
         unit = match.group(2).lower()
         multiplier = _UNIT_MULTIPLIERS.get(unit, 1)
         delta_key = _UNIT_DELTAS.get(unit, "days")
-        return datetime.utcnow() - timedelta(**{delta_key: amount * multiplier})
+        return datetime.now(timezone.utc) - timedelta(**{delta_key: amount * multiplier})
 
     @staticmethod
     def _parse_absolute_date(text: str) -> Optional[datetime]:

@@ -1,7 +1,7 @@
 """Cleaning pipeline orchestrator — IntermediateJob → CleanedJob."""
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
@@ -95,7 +95,7 @@ class CleanedJob(BaseModel):
     external_id: str
     raw_url: str
 
-    cleaning_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    cleaning_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     cleaning_steps_applied: List[str] = Field(default_factory=list)
 
 

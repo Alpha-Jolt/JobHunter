@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -20,7 +20,7 @@ class JobAnalysis(BaseModel):
     application_tone: str = Field(default="formal")
 
     # Metadata
-    analysis_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    analysis_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     prompt_version_used: str = Field(default="")
     tokens_used: int = Field(default=0)
     job_id: str = Field(default="")

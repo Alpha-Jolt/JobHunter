@@ -17,4 +17,4 @@ pytest-cov==5.0.0
 black==24.4.2
 flake8==7.0.0
 email-validator==2.1.1
-jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.1.1
+jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.2.0

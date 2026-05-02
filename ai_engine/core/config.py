@@ -87,6 +87,19 @@ class LoggingSettings(BaseSettings):
         return v.upper()
 
 
+class MinIOSettings(BaseSettings):
+    """MinIO S3 configuration."""
+
+    model_config = SettingsConfigDict(env_prefix="MINIO_", env_file=".env", extra="ignore")
+
+    endpoint: str = Field(default="localhost:9000")
+    access_key: str = Field(default="minioadmin")
+    secret_key: str = Field(default="minioadmin")
+    bucket_name: str = Field(default="jobhunter-resumes")
+    use_ssl: bool = Field(default=False)
+    enabled: bool = Field(default=True)
+
+
 class Settings(BaseSettings):
     """Root configuration object — single source of truth."""
 
@@ -96,6 +109,7 @@ class Settings(BaseSettings):
     paths: PathSettings = Field(default_factory=PathSettings)
     variants: VariantSettings = Field(default_factory=VariantSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    minio: MinIOSettings = Field(default_factory=MinIOSettings)
 
     # Application identity
     app_name: str = Field(default="JobHunter-AIEngine", alias="APP_NAME")

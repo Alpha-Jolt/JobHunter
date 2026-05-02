@@ -1,6 +1,6 @@
 """Unit tests for DateCleaner."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -10,18 +10,18 @@ from scraper.cleaning.date_cleaner import DateCleaner
 def test_just_now():
     result = DateCleaner.parse_posted_date("just now")
     assert result is not None
-    assert (datetime.utcnow() - result).total_seconds() < 5
+    assert (datetime.now(timezone.utc) - result).total_seconds() < 5
 
 
 def test_days_ago():
     result = DateCleaner.parse_posted_date("3 days ago")
-    expected = datetime.utcnow() - timedelta(days=3)
+    expected = datetime.now(timezone.utc) - timedelta(days=3)
     assert abs((result - expected).total_seconds()) < 10
 
 
 def test_weeks_ago():
     result = DateCleaner.parse_posted_date("2 weeks ago")
-    expected = datetime.utcnow() - timedelta(weeks=2)
+    expected = datetime.now(timezone.utc) - timedelta(weeks=2)
     assert abs((result - expected).total_seconds()) < 10
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ class ComparisonResult(BaseModel):
     strength_summary: str = ""
 
     # Metadata
-    comparison_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    comparison_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     prompt_version_used: str = ""
     job_id: str = ""
 

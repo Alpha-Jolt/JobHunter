@@ -73,6 +73,11 @@ Copy `ai_engine/.env.example` to `.env` and set at minimum one provider key.
 | `USE_SHARED_REGISTRY` | `false` | Read jobs from / write variants to `shared` registries |
 | `SHARED_JOBS_REGISTRY_PATH` | `registries/jobs.json` | Path to shared jobs registry |
 | `SHARED_VARIANTS_REGISTRY_PATH` | `registries/variants.json` | Path to shared variants registry |
+| `MINIO_ENDPOINT` | `localhost:9000` | MinIO API endpoint |
+| `MINIO_ACCESS_KEY` | `minioadmin` | MinIO access key |
+| `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
+| `MINIO_BUCKET_NAME` | `jobhunter-resumes` | S3 bucket for resume files |
+| `MINIO_ENABLED` | `true` | Enable S3 uploads; falls back to local on failure |
 
 ---
 
@@ -114,6 +119,27 @@ config = PipelineConfig(
     session_id="session-001",
     use_shared_registry=True,
 )
+```
+
+---
+
+## MinIO S3 Storage
+
+When `MINIO_ENABLED=true`, `OutputBuilder` uploads rendered resume PDFs, DOCX files, and cover letters to MinIO after generation. S3 keys are stored on `VariantRecord` (`pdf_key`, `docx_key`, `cover_letter_key`). If the upload fails, the builder falls back to local paths and sets `s3_upload_failed=True` on the `OutputPackage`.
+
+### S3 key format
+
+```
+resumes/{user_id}/{job_id}/{YYYYMMDD_HHMMSS}_{file_type}.{ext}
+```
+
+### Start MinIO
+
+```bash
+# From project root
+docker compose -f DOCKER-COMPOSE.yml up -d minio
+bash scripts/setup_minio.sh
+# Console: http://localhost:9001  (minioadmin / minioadmin)
 ```
 
 ---

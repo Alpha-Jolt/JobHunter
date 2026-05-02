@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from ai_engine.core.logging_.logger import get_logger
 from ai_engine.features.analysis.models.job_analysis import JobAnalysis
@@ -13,6 +14,7 @@ from ai_engine.features.output.models.output_package import OutputPackage
 from ai_engine.features.output.renderers.cover_letter_renderer import render_cover_letter
 from ai_engine.features.output.renderers.email_renderer import render_email
 from ai_engine.features.output.renderers.resume_renderer import render_resume
+from ai_engine.features.output.storage.minio_uploader import MinIOUploader, MinIOUploadError
 from ai_engine.features.output.strategies.llm_cover_letter_strategy import LLMCoverLetterStrategy
 from ai_engine.features.output.templating.variable_mapper import map_email_variables
 
@@ -27,6 +29,7 @@ class OutputBuilder:
         cover_letter_strategy: LLMCoverLetterStrategy for cover letter generation.
         ai_output_dir: Root directory for all output files.
         email_template_path: Path to the user's email template (optional).
+        minio_uploader: MinIOUploader for S3 uploads (optional).
     """
 
     def __init__(
@@ -35,11 +38,13 @@ class OutputBuilder:
         cover_letter_strategy: LLMCoverLetterStrategy,
         ai_output_dir: Path,
         email_template_path: Path | None = None,
+        minio_uploader: Optional[MinIOUploader] = None,
     ) -> None:
         self._gate = approval_gate
         self._cover_letter = cover_letter_strategy
         self._output_dir = ai_output_dir
         self._email_template = email_template_path
+        self._minio = minio_uploader
 
     async def build(
         self,
@@ -57,7 +62,7 @@ class OutputBuilder:
             job: Original JobRecord for metadata.
 
         Returns:
-            OutputPackage with paths to all generated files.
+            OutputPackage with paths to all generated files and S3 keys.
 
         Raises:
             ApprovalRequiredError: If variant is not approved.
@@ -83,6 +88,36 @@ class OutputBuilder:
                 self._email_template, variables, session_dir, job.job_id
             )
 
+        # Upload to MinIO if configured
+        pdf_s3_key = ""
+        docx_s3_key = ""
+        cl_s3_key = ""
+        upload_failed = False
+
+        if self._minio:
+            try:
+                pdf_s3_key = await self._minio.upload_file(
+                    Path(pdf_path), user_id=variant_id, job_id=job.job_id, file_type="resume_pdf"
+                )
+                if docx_path:
+                    docx_s3_key = await self._minio.upload_file(
+                        Path(docx_path),
+                        user_id=variant_id,
+                        job_id=job.job_id,
+                        file_type="resume_docx",
+                    )
+                cl_s3_key = await self._minio.upload_file(
+                    Path(cl_path), user_id=variant_id, job_id=job.job_id, file_type="cover_letter"
+                )
+                logger.info(
+                    "output_builder.minio_uploaded",
+                    variant_id=variant_id,
+                    pdf_key=pdf_s3_key,
+                )
+            except MinIOUploadError as e:
+                logger.warning("output_builder.minio_failed", error=str(e))
+                upload_failed = True
+
         package = OutputPackage(
             variant_id=variant_id,
             job_id=job.job_id,
@@ -90,6 +125,10 @@ class OutputBuilder:
             resume_pdf_path=pdf_path,
             cover_letter_pdf_path=cl_path,
             email_draft_path=email_path,
+            pdf_s3_key=pdf_s3_key,
+            docx_s3_key=docx_s3_key,
+            cover_letter_s3_key=cl_s3_key,
+            s3_upload_failed=upload_failed,
             manifest={
                 "job_title": job.title,
                 "company": job.company,
@@ -104,5 +143,6 @@ class OutputBuilder:
             docx=bool(docx_path),
             cover_letter=bool(cl_path),
             email=bool(email_path),
+            s3_uploaded=not upload_failed and bool(pdf_s3_key),
         )
         return package

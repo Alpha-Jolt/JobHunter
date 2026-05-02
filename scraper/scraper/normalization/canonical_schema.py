@@ -1,6 +1,6 @@
 """Canonical job schema — unified output format."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -49,7 +49,7 @@ class CanonicalJob(BaseModel):
     # Timestamps
     posted_at: Optional[datetime] = None
     posted_days_ago: Optional[int] = None
-    scraped_at: datetime = Field(default_factory=datetime.utcnow)
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Quality
     completeness_score: float = Field(default=0.0, ge=0.0, le=1.0)

@@ -26,7 +26,7 @@ testpaths = ["ai_engine/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=ai_engine --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=ai_engine --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
 omit = [

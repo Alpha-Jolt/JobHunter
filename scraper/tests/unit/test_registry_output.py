@@ -1,7 +1,7 @@
 """Unit tests for RegistryOutput adapter."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -18,7 +18,7 @@ def _make_canonical(**kwargs) -> CanonicalJob:
         title="Python Developer",
         company_name="Acme",
         description="Build APIs with Python and Django." * 10,
-        scraped_at=datetime.utcnow(),
+        scraped_at=datetime.now(timezone.utc),
     )
     defaults.update(kwargs)
     return CanonicalJob(**defaults)

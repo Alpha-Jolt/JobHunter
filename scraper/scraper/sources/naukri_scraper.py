@@ -6,7 +6,7 @@ Job details: JobPosting JSON-LD -> full data (description, salary, etc.)
 
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from playwright.async_api import Page, TimeoutError as PlaywrightTimeout
@@ -313,7 +313,7 @@ class NaukriScraper(BaseScraper):
             posted_date_raw=posted_date_raw or None,
             apply_url=job_url,
             skills_required_raw=skills,
-            extraction_timestamp=datetime.utcnow(),
+            extraction_timestamp=datetime.now(timezone.utc),
             extraction_duration_ms=duration_s * 1000,
             extraction_source="html_parser",
         )
@@ -363,7 +363,7 @@ class NaukriScraper(BaseScraper):
             raw_url=job_url,
             experience_raw=experience_raw,
             apply_url=job_url,
-            extraction_timestamp=datetime.utcnow(),
+            extraction_timestamp=datetime.now(timezone.utc),
             extraction_duration_ms=duration_s * 1000,
             extraction_source="html_parser",
         )
