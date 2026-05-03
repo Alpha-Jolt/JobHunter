@@ -232,3 +232,5 @@ REPORT.md
 
 # scripts
 scripts
+# Runtime registry data
+registries/*.json

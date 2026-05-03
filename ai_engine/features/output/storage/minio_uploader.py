@@ -136,7 +136,8 @@ class MinIOUploader:
         loop = asyncio.get_event_loop()
         try:
             await loop.run_in_executor(
-                None, self.s3_client.head_object, self.bucket_name, s3_key
+                None,
+                lambda: self.s3_client.head_object(Bucket=self.bucket_name, Key=s3_key),
             )
             return True
         except ClientError as e:

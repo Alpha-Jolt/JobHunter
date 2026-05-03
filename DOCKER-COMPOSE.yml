@@ -72,6 +72,24 @@ services:
       - ./registries:/app/registries
       - ./scraper/output:/app/output
 
+  shared-registry-service:
+    build:
+      context: .
+      dockerfile: services/shared-registry-service/Dockerfile
+    container_name: jobhunter-shared-registry
+    environment:
+      API_KEY_TOKEN: ${SHARED_REGISTRY_API_KEY:-secret-phase-0-change-me}
+      MINIO_ENDPOINT: minio:9000
+      LOG_LEVEL: INFO
+    ports:
+      - "8003:8003"
+    depends_on:
+      - minio
+    volumes:
+      - ./registries:/app/registries
+    networks:
+      - jobhunter_network
+
   redis:
     image: redis:7-alpine
     ports:
