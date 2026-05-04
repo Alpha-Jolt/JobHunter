@@ -1,0 +1,13 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+pydantic==2.11.4
+pydantic-settings==2.9.1
+sqlalchemy[asyncio]==2.0.41
+asyncpg==0.30.0
+python-dotenv==1.1.0
+structlog==25.3.0
+pytest==8.3.5
+pytest-asyncio==0.26.0
+pytest-cov==6.1.0
+httpx==0.28.1
+jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.2.1

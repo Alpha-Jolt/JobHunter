@@ -1,6 +1,20 @@
+# JobHunter Services
+
+This directory contains standalone FastAPI services that expose internal libraries as REST APIs.
+
+## Services
+
+| Service | Port | Description |
+|---|---|---|
+| `shared-registry-service/` | 8003 | REST adapter for the `jobhunter-dpl` shared library |
+
+> The primary orchestration API lives at `orchestration/` (port 8000) — see [orchestration/README.md](../orchestration/README.md).
+
+---
+
 # Shared Registry Service
 
-FastAPI adapter that exposes the `shared/` Python library as a language-agnostic REST API on port **8003**.
+FastAPI adapter that exposes the `jobhunter-dpl` shared library as a language-agnostic REST API on port **8003**.
 
 ## Endpoints
 
@@ -13,7 +27,7 @@ FastAPI adapter that exposes the `shared/` Python library as a language-agnostic
 | GET | `/api/jobs/status/{status}` | List jobs by status |
 | GET | `/api/jobs/all-with-email` | List jobs with apply_email set |
 | GET | `/api/variants/{variant_id}` | Get variant by ID |
-| GET | `/api/variants/approved/{job_id}/{user_id}` | Get approved variant (Mail-Bridge) |
+| GET | `/api/variants/approved/{job_id}/{user_id}` | Get approved variant |
 | GET | `/api/variants/for-user/{user_id}` | List variants for user |
 | POST | `/api/variants` | Create variant |
 | PATCH | `/api/variants/{variant_id}/approval` | Update approval status |

@@ -104,6 +104,27 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 
 ---
 
-## Documentation
+## Current Build Status
+
+> **Phase 0 — In Progress**
+
+| Module | Status |
+|---|---|
+| Scraper Engine | ✅ Complete |
+| Data Persistence Layer (DPL) | ✅ Complete |
+| AI Engine | ✅ Complete |
+| MinIO S3 Storage | ✅ Complete |
+| Shared Registry Service | ✅ Complete |
+| Orchestration API | ✅ Complete (Phase 0) |
+| Mail Engine | 🔜 Phase 0+ |
+| Frontend | 🔜 Phase 1 |
 
 ---
+
+## Documentation
+
+- [Root Operational Guide](SUMMARY.md)
+- [Scraper Engine](scraper/README.md)
+- [AI Engine](ai_engine/README.md)
+- [Shared Registry Service](services/README.md)
+- [Orchestration API](orchestration/README.md)
