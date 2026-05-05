@@ -81,4 +81,7 @@ async def root() -> JSONResponse:
 
 
 # ── Feature routers ──────────────────────────────────────────────────────────
+from orchestration.api.routes.ai import router as ai_router
+
 app.include_router(scraper_router.router, prefix="/api", tags=["scraper"])
+app.include_router(ai_router, prefix="/api/ai", tags=["ai"])

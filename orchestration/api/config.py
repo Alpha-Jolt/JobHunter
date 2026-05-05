@@ -27,9 +27,19 @@ class APIConfig(BaseSettings):
     secret_key_approval: str = Field(
         default="changeme-32-char-secret-key-here", alias="SECRET_KEY_APPROVAL"
     )
+    approval_token_secret: str = Field(
+        default="changeme-32-char-secret-key-here", alias="APPROVAL_TOKEN_SECRET"
+    )
     max_applications_per_day: int = Field(default=10, alias="MAX_APPLICATIONS_PER_DAY")
     max_variants_per_session: int = Field(default=15, alias="MAX_VARIANTS_PER_SESSION")
     max_variants_total: int = Field(default=50, alias="MAX_VARIANTS_TOTAL")
+
+    @field_validator("approval_token_secret")
+    @classmethod
+    def _validate_approval_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("APPROVAL_TOKEN_SECRET must be at least 32 characters")
+        return v
 
 
 class ServicePaths(BaseSettings):
