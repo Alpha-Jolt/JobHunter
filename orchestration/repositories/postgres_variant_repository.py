@@ -222,10 +222,14 @@ class PostgresVariantRepository(VariantRegistryBase):
         import orchestration.db.models as _m
         ResumeVariant = _m.ResumeVariant
 
+        from datetime import datetime, timezone
+        values: dict = {"approval_status": status}
+        if status == "approved":
+            values["approved_at"] = datetime.now(timezone.utc)
         result = await self._session.execute(
             update(ResumeVariant)
             .where(ResumeVariant.variant_id == str(variant_id))
-            .values(approval_status=status)
+            .values(**values)
         )
         if result.rowcount == 0:
             raise VariantNotFoundError(
