@@ -228,3 +228,9 @@ implementation
 # Work Logs
 LOGS.md
 SUMMARY.md
+REPORT.md
+
+# scripts
+scripts
+# Runtime registry data
+registries/*.json

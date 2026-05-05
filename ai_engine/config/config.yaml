@@ -1,0 +1,9 @@
+# Variant Manager Default Configuration
+variant_budget:
+  max_total: 50
+  max_per_session: 10
+  warning_threshold: 0.8
+
+registry:
+  type: json  # json | database
+  path: ai_output/variant_registry.json

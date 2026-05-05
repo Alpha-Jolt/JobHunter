@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: jobhunter-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/minio_data
+    command: server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobhunter_network
+
+  scraper:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    volumes:
+      - ./scraper/output:/app/output
+      - ./scraper/logs:/app/logs
+      - ./registries:/app/registries
+    depends_on:
+      - redis
+
+  admin_dashboard:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    command: ["uvicorn", "admin_dashboard.app:app", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./scraper/output:/app/output
+      - ./scraper/logs:/app/logs
+    depends_on:
+      - redis
+
+  data_collector:
+    build:
+      context: .
+      dockerfile: scraper/docker/Dockerfile
+    env_file:
+      - ./scraper/.env
+    command: ["uvicorn", "data_collector_ui.app:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+    depends_on:
+      - redis
+
+  ai_engine:
+    build:
+      context: .
+      dockerfile: ai_engine/Dockerfile
+    env_file:
+      - ./ai_engine/.env
+    volumes:
+      - ./ai_output:/app/ai_output
+      - ./registries:/app/registries
+      - ./scraper/output:/app/output
+
+  shared-registry-service:
+    build:
+      context: .
+      dockerfile: services/shared-registry-service/Dockerfile
+    container_name: jobhunter-shared-registry
+    environment:
+      API_KEY_TOKEN: ${SHARED_REGISTRY_API_KEY:-secret-phase-0-change-me}
+      MINIO_ENDPOINT: minio:9000
+      LOG_LEVEL: INFO
+    ports:
+      - "8003:8003"
+    depends_on:
+      - minio
+    volumes:
+      - ./registries:/app/registries
+    networks:
+      - jobhunter_network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  minio_data:
+
+networks:
+  jobhunter_network:
+    driver: bridge
