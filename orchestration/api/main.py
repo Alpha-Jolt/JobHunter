@@ -1,9 +1,11 @@
 """JobHunter Orchestration API — FastAPI application entry point."""
 
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from orchestration.api.config import get_settings
 from orchestration.api.middleware import (
@@ -13,9 +15,16 @@ from orchestration.api.middleware import (
     add_cors,
 )
 from orchestration.api.routes import scraper as scraper_router
-from orchestration.db.connection import dispose_engine, init_engine, validate_connection
+from orchestration.api.routes.ai import router as ai_router
+from orchestration.api.routes.mail import router as mail_router
+from orchestration.api.routes.admin import router as admin_router
+from orchestration.api.routes.health import router as health_router
+from orchestration.core.logging_setup import setup_logging
+from orchestration.db.connection import dispose_engine, init_engine
 
-logging.basicConfig(level=logging.INFO)
+settings = get_settings()
+setup_logging(log_level=settings.api.log_level, log_format="json")
+
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -26,7 +35,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ── Middleware (order matters: first added = outermost) ──────────────────────
+# ── Middleware ───────────────────────────────────────────────────────────────
 add_cors(app)
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
@@ -36,12 +45,12 @@ app.add_middleware(RequestIDMiddleware)
 # ── Lifecycle ────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def on_startup() -> None:
-    settings = get_settings()
     init_engine(
         settings.database.database_url,
         pool_size=settings.database.db_pool_size,
         max_overflow=settings.database.db_max_overflow,
     )
+    os.makedirs("logs", exist_ok=True)
     logger.info("JobHunter Orchestration API started")
 
 
@@ -51,27 +60,7 @@ async def on_shutdown() -> None:
     logger.info("JobHunter Orchestration API stopped")
 
 
-# ── Core routes ──────────────────────────────────────────────────────────────
-@app.get("/health", tags=["system"])
-async def health() -> JSONResponse:
-    """Liveness probe — always returns 200 if the process is running."""
-    return JSONResponse({"status": "ok"})
-
-
-@app.get("/readiness", tags=["system"])
-async def readiness() -> JSONResponse:
-    """Readiness probe — checks database connectivity."""
-    try:
-        await validate_connection()
-        return JSONResponse({"status": "ok", "database": "connected"})
-    except Exception as exc:
-        logger.warning("Readiness check failed: %s", exc)
-        return JSONResponse(
-            status_code=503,
-            content={"status": "unavailable", "database": "disconnected", "detail": str(exc)},
-        )
-
-
+# ── Root ─────────────────────────────────────────────────────────────────────
 @app.get("/", tags=["system"])
 async def root() -> JSONResponse:
     """Welcome message."""
@@ -81,7 +70,13 @@ async def root() -> JSONResponse:
 
 
 # ── Feature routers ──────────────────────────────────────────────────────────
-from orchestration.api.routes.ai import router as ai_router
-
+app.include_router(health_router)
 app.include_router(scraper_router.router, prefix="/api", tags=["scraper"])
 app.include_router(ai_router, prefix="/api/ai", tags=["ai"])
+app.include_router(mail_router)
+app.include_router(admin_router)
+
+# ── Static files (admin dashboard) ──────────────────────────────────────────
+_admin_dir = os.path.join(os.path.dirname(__file__), "..", "static", "admin")
+if os.path.isdir(_admin_dir):
+    app.mount("/admin", StaticFiles(directory=_admin_dir, html=True), name="admin")

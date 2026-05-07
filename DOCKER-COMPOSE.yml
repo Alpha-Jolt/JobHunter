@@ -95,8 +95,56 @@ services:
     ports:
       - "6379:6379"
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: jobhunter-postgres
+    environment:
+      POSTGRES_USER: jobhunter
+      POSTGRES_PASSWORD: jobhunter
+      POSTGRES_DB: jobhunter
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobhunter_network
+
+  jobhunter-api:
+    build:
+      context: .
+      dockerfile: orchestration/Dockerfile
+    container_name: jobhunter-api
+    env_file:
+      - ./orchestration/.env
+    environment:
+      MAIL_BRIDGE_URL: http://mail-bridge:3000
+      MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    networks:
+      - jobhunter_network
+
+  # mail-bridge:
+  #   build:
+  #     context: ../Mail-Engine/Mail-Bridge
+  #   container_name: mail-bridge
+  #   environment:
+  #     REGISTRY_TYPE: memory
+  #     SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+  #     SENDER_EMAIL: apply@jobhunter.app
+  #     SENDER_NAME: JobHunter
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - jobhunter-api
+  #   networks:
+  #     - jobhunter_network
+
 volumes:
   minio_data:
+  postgres_data:
 
 networks:
   jobhunter_network:

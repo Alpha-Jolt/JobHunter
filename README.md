@@ -115,8 +115,9 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 | AI Engine + Approval Workflow  | ✅ Complete |
 | MinIO S3 Storage | ✅ Complete |
 | Shared Registry Service | ✅ Complete |
-| Orchestration API | ✅ Complete (Phase 0) |
-| Mail Engine | 🔜 Phase 0+ |
+| Orchestration API | ✅ Complete |
+| Mail Service Integration | ✅ Complete |
+| Admin Dashboard | ✅ Complete |
 | Frontend | 🔜 Phase 1 |
 
 ---
