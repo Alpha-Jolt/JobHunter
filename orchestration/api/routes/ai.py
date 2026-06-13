@@ -6,6 +6,8 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from orchestration.auth.dependencies import require_role
+from orchestration.auth.models.user import RoleEnum
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -132,7 +134,8 @@ class RejectVariantResponse(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK)
+@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
 async def generate_variant(
     body: GenerateVariantRequest,
     session: AsyncSession = Depends(get_db_session),

@@ -19,6 +19,8 @@ from orchestration.api.routes.ai import router as ai_router
 from orchestration.api.routes.mail import router as mail_router
 from orchestration.api.routes.admin import router as admin_router
 from orchestration.api.routes.health import router as health_router
+from orchestration.auth.routes.auth import router as auth_router
+from orchestration.auth.middleware import JWTLoggingMiddleware
 from orchestration.core.logging_setup import setup_logging
 from orchestration.db.connection import dispose_engine, init_engine
 
@@ -40,6 +42,7 @@ add_cors(app)
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(JWTLoggingMiddleware)
 
 
 # ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -71,6 +74,7 @@ async def root() -> JSONResponse:
 
 # ── Feature routers ──────────────────────────────────────────────────────────
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(scraper_router.router, prefix="/api", tags=["scraper"])
 app.include_router(ai_router, prefix="/api/ai", tags=["ai"])
 app.include_router(mail_router)

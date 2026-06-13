@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models for JobHunter Phase 0 PostgreSQL schema."""
+"""SQLAlchemy ORM models for JobHunter Phase 0+ PostgreSQL schema."""
 
 import uuid
 
@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     Numeric,
@@ -22,6 +23,50 @@ from sqlalchemy.orm import DeclarativeBase, relationship
 class Base(DeclarativeBase):
     pass
 
+
+# ── Auth models ───────────────────────────────────────────────────────────────
+
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    first_name = Column(String(255))
+    last_name = Column(String(255))
+    phone = Column(String(20))
+    role = Column(Enum("hunter", "mentor", "recruiter", "admin", name="user_role"), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verified_at = Column(DateTime(timezone=True))
+    last_login_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    token_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash = Column(String(255), nullable=False)
+    issued_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    revoked = Column(Boolean, nullable=False, default=False)
+    revoked_at = Column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "token_hash", name="refresh_tokens_user_hash_unique"),
+    )
+
+    user = relationship("User", back_populates="refresh_tokens")
+
+
+# ── Job models ────────────────────────────────────────────────────────────────
 
 class Job(Base):
     __tablename__ = "jobs"
@@ -48,6 +93,9 @@ class Job(Base):
     scraped_at = Column(DateTime(timezone=True), server_default=func.now())
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String(20), nullable=False, default="raw")
+    recruiter_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="SET NULL"), nullable=True
+    )
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
@@ -75,7 +123,7 @@ class MasterResume(Base):
     __tablename__ = "master_resumes"
 
     resume_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     file_name = Column(String(500), nullable=False)
     file_path = Column(Text, nullable=False)
     parsed_json = Column(JSONB, nullable=False, default=dict)
@@ -89,7 +137,7 @@ class ResumeVariant(Base):
     __tablename__ = "resume_variants"
 
     variant_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     job_id = Column(
         UUID(as_uuid=True), ForeignKey("jobs.job_id", ondelete="CASCADE"), nullable=False
     )
@@ -130,7 +178,7 @@ class CoverLetter(Base):
     __tablename__ = "cover_letters"
 
     cover_letter_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     job_id = Column(
         UUID(as_uuid=True), ForeignKey("jobs.job_id", ondelete="CASCADE"), nullable=False
     )
@@ -151,7 +199,7 @@ class ApplicationLog(Base):
     __tablename__ = "application_log"
 
     application_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(String(255), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     job_id = Column(
         UUID(as_uuid=True), ForeignKey("jobs.job_id", ondelete="RESTRICT"), nullable=False
     )

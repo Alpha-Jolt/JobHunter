@@ -4,6 +4,8 @@ import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from orchestration.auth.dependencies import require_role
+from orchestration.auth.models.user import RoleEnum
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,7 +61,8 @@ class JobCountsResponse(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post("/scraper/start", response_model=StartScraperResponse, status_code=201)
+@router.post("/scraper/start", response_model=StartScraperResponse, status_code=201,
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def start_scraper(
     body: StartScraperRequest,
     session: AsyncSession = Depends(get_db_session),
@@ -92,7 +95,8 @@ async def start_scraper(
     )
 
 
-@router.get("/scraper/status/{run_id}", response_model=ScraperStatusResponse)
+@router.get("/scraper/status/{run_id}", response_model=ScraperStatusResponse,
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_scraper_status(
     run_id: uuid.UUID,
     session: AsyncSession = Depends(get_db_session),
@@ -105,7 +109,8 @@ async def get_scraper_status(
     return ScraperStatusResponse(**data)
 
 
-@router.get("/scraper/latest-jobs", response_model=List[JobSummary])
+@router.get("/scraper/latest-jobs", response_model=List[JobSummary],
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_latest_jobs(
     source: Optional[str] = Query(default=None, description="Filter by source"),
     limit: int = Query(default=20, ge=1, le=200),
@@ -130,7 +135,8 @@ async def get_latest_jobs(
     ]
 
 
-@router.get("/scraper/counts", response_model=JobCountsResponse)
+@router.get("/scraper/counts", response_model=JobCountsResponse,
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_job_counts(
     session: AsyncSession = Depends(get_db_session),
 ) -> JobCountsResponse:

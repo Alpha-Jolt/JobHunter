@@ -133,6 +133,11 @@ Copy `.env.example` to `.env`.
 | `MAX_VARIANTS_TOTAL` | `50` | Global variant cap per user |
 | `MAIL_BRIDGE_URL` | `http://localhost:3000` | Mail-Bridge service URL |
 | `MAIL_BRIDGE_API_KEY` | _(empty)_ | API key for Mail-Bridge |
+| `MINIO_ENDPOINT` | `minio:9000` | MinIO host:port (use `localhost:9000` locally) |
+| `MINIO_ACCESS_KEY` | `minioadmin` | MinIO access key |
+| `MINIO_SECRET_KEY` | `minioadmin` | MinIO secret key |
+| `MINIO_BUCKET_NAME` | `jobhunter-resumes` | Bucket for resume files |
+| `MINIO_SECURE` | `false` | HTTPS for MinIO (set true in prod) |
 
 ---
 
@@ -175,3 +180,26 @@ PYTHONPATH=.. .venv/bin/pytest tests/ -v   # 40 tests
 ```bash
 .venv/bin/flake8 . --exclude=.venv --max-line-length=100   # 0 errors
 ```
+
+---
+
+## Authentication & RBAC
+
+Auth is centralized in this service. Internal services (Scraper, AI Engine, Mail-Bridge) use pre-shared API keys — no JWT.
+
+**Auth endpoints:**
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/auth/register` | Public | Create account |
+| POST | `/api/auth/login` | Public | Login → JWT + refresh cookie |
+| GET | `/api/auth/me` | Bearer JWT | Current user profile |
+| PATCH | `/api/auth/me/password` | Bearer JWT | Change password |
+| POST | `/api/auth/refresh` | JWT + cookie | Rotate refresh token |
+| POST | `/api/auth/logout` | Bearer JWT | Revoke refresh token |
+
+**Roles:** `hunter` · `mentor` · `recruiter` · `admin`
+
+See [`docs/AUTH.md`](../docs/AUTH.md) for token formats and flow.  
+See [`docs/RBAC.md`](../docs/RBAC.md) for role matrix and policy examples.
+

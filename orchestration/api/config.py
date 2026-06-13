@@ -67,6 +67,34 @@ class MailConfig(BaseSettings):
     mail_bridge_api_key: str = Field(default="", alias="MAIL_BRIDGE_API_KEY")
 
 
+
+
+class AuthConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    jwt_secret: str = Field(default="changeme-jwt-secret-key-minimum-32chars!", alias="JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_expiry_minutes: int = Field(default=15, alias="JWT_EXPIRY_MINUTES")
+    refresh_token_expiry_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRY_DAYS")
+    min_password_length: int = Field(default=8, alias="MIN_PASSWORD_LENGTH")
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def _validate_jwt_secret(cls, v: str) -> str:
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters")
+        return v
+
+
+class MinIOConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    minio_endpoint: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
+    minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
+    minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
+    minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
+
 class Settings(BaseSettings):
     """Aggregated application settings."""
 
@@ -77,6 +105,8 @@ class Settings(BaseSettings):
     paths: ServicePaths = Field(default_factory=ServicePaths)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     mail: MailConfig = Field(default_factory=MailConfig)
+    auth: AuthConfig = Field(default_factory=AuthConfig)
+    minio: MinIOConfig = Field(default_factory=MinIOConfig)
 
     @field_validator("database", mode="before")
     @classmethod

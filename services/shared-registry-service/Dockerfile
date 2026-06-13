@@ -1,15 +1,13 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY services/shared-registry-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install shared package
-COPY --from=shared . /shared
-RUN pip install --no-cache-dir /shared
-
-COPY . .
+COPY services/shared-registry-service/ .
 
 EXPOSE 8003
 

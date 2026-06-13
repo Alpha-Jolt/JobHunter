@@ -1,9 +1,12 @@
+from typing import Optional
 """Admin dashboard API routes."""
 
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from orchestration.auth.dependencies import require_role
+from orchestration.auth.models.user import RoleEnum
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +25,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-@router.get("/dashboard/metrics")
+@router.get("/dashboard/metrics",
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_metrics(
     session: AsyncSession = Depends(get_db_session),
     job_registry: PostgresJobRepository = Depends(get_job_registry),
@@ -82,7 +86,8 @@ async def get_metrics(
         raise HTTPException(status_code=500, detail="Failed to fetch metrics")
 
 
-@router.get("/variants-pending")
+@router.get("/variants-pending",
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_pending_variants(
     session: AsyncSession = Depends(get_db_session),
 ):
@@ -115,7 +120,8 @@ async def get_pending_variants(
         raise HTTPException(status_code=500, detail="Failed to fetch pending variants")
 
 
-@router.get("/applications-log")
+@router.get("/applications-log",
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_applications_log(
     skip: int = 0,
     limit: int = 50,
@@ -159,7 +165,8 @@ async def get_applications_log(
         raise HTTPException(status_code=500, detail="Failed to fetch applications")
 
 
-@router.get("/scraper-runs")
+@router.get("/scraper-runs",
+    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_scraper_runs(
     limit: int = 10,
     scraper_runs_repo: PostgresScraperRunsRepository = Depends(get_scraper_runs_repo),
@@ -192,3 +199,105 @@ async def get_scraper_runs(
     except Exception as e:
         logger.error("scraper_runs_error", extra={"error": str(e)})
         raise HTTPException(status_code=500, detail="Failed to fetch scraper runs")
+
+
+# ── User management (Admin only) ──────────────────────────────────────────────
+
+@router.get("/users", dependencies=[Depends(require_role(RoleEnum.ADMIN))])
+async def list_users(
+    role: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """List all users with optional role filter."""
+    from orchestration.auth.repository import AuthRepository
+    repo = AuthRepository(session)
+    role_enum = RoleEnum(role) if role else None
+    users = await repo.list_users(role=role_enum, limit=limit, offset=offset)
+    return {
+        "count": len(users),
+        "users": [
+            {
+                "user_id": str(u.user_id),
+                "email": u.email,
+                "role": u.role.value,
+                "is_active": u.is_active,
+                "is_verified": u.is_verified,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+                "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            }
+            for u in users
+        ],
+    }
+
+
+@router.get("/users/{user_id}", dependencies=[Depends(require_role(RoleEnum.ADMIN))])
+async def get_user(
+    user_id: str,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Get a single user by ID."""
+    import uuid as _uuid
+    from orchestration.auth.repository import AuthRepository
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    repo = AuthRepository(session)
+    user = await repo.get_user_by_id(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": str(user.user_id),
+        "email": user.email,
+        "role": user.role.value,
+        "is_active": user.is_active,
+        "is_verified": user.is_verified,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+    }
+
+
+@router.patch("/users/{user_id}/role", dependencies=[Depends(require_role(RoleEnum.ADMIN))])
+async def change_user_role(
+    user_id: str,
+    body: dict,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Change a user's role. Admin only. (Phase 3+ full enforcement)."""
+    import uuid as _uuid
+    from orchestration.auth.repository import AuthRepository
+    try:
+        uid = _uuid.UUID(user_id)
+        new_role = RoleEnum(body.get("role", ""))
+    except (ValueError, KeyError):
+        raise HTTPException(status_code=400, detail="Invalid user_id or role")
+    repo = AuthRepository(session)
+    user = await repo.get_user_by_id(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await repo.update_role(uid, new_role)
+    return {"user_id": user_id, "role": new_role.value}
+
+
+@router.delete("/users/{user_id}", dependencies=[Depends(require_role(RoleEnum.ADMIN))])
+async def deactivate_user(
+    user_id: str,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Deactivate a user account (soft delete)."""
+    import uuid as _uuid
+    from orchestration.auth.repository import AuthRepository
+    try:
+        uid = _uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user_id")
+    repo = AuthRepository(session)
+    user = await repo.get_user_by_id(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await repo.deactivate_user(uid)
+    return {"success": True}

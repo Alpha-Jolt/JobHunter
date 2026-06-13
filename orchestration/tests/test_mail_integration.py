@@ -6,6 +6,45 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from orchestration.services.mail_service import MailService
 from orchestration.core.exceptions import (
+
+# ── Auth test helpers ─────────────────────────────────────────────────────────
+import uuid as _uuid
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+from unittest.mock import patch as _patch
+from orchestration.auth.tokens import encode_access_token as _encode
+from orchestration.auth.models.user import RoleEnum as _RoleEnum, UserRecord as _UserRecord
+
+_TEST_SECRET = "test-secret-key-that-is-32-chars!!"
+_TEST_ALG = "HS256"
+
+def _make_admin_user():
+    return _UserRecord(
+        user_id=_uuid.uuid4(), email="admin@example.com",
+        password_hash="hash", role=_RoleEnum.ADMIN,
+    )
+
+def _admin_token(user=None):
+    u = user or _make_admin_user()
+    tok = _encode(str(u.user_id), u.role, _TEST_SECRET, _TEST_ALG,
+                  _dt.now(_tz.utc) + _td(minutes=15))
+    return tok, u
+
+def _auth_headers(user=None):
+    tok, u = _admin_token(user)
+    return {"Authorization": f"Bearer {tok}"}, u
+
+def _patch_auth(user=None):
+    """Context manager to patch auth deps for a given user."""
+    u = user or _make_admin_user()
+    tok, _ = _admin_token(u)
+    return _patch(
+        "orchestration.auth.dependencies._get_jwt_config",
+        return_value=(_TEST_SECRET, _TEST_ALG)
+    ), _patch(
+        "orchestration.auth.dependencies.AuthRepository"
+    ), u, tok
+# ─────────────────────────────────────────────────────────────────────────────
+
     ApprovalRequiredError,
     DuplicateApplicationError,
     RateLimitError,

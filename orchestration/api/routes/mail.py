@@ -1,6 +1,8 @@
 # orchestration/api/routes/mail.py
 
 from fastapi import APIRouter, Depends, HTTPException
+from orchestration.auth.dependencies import require_role
+from orchestration.auth.models.user import RoleEnum
 from pydantic import BaseModel, EmailStr
 import logging
 
@@ -58,7 +60,7 @@ class SentTodayResponse(BaseModel):
 # Endpoints
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/send", response_model=SendApplicationResponse)
+@router.post("/send", response_model=SendApplicationResponse, dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
 async def send_application(
     request: SendApplicationRequest,
     mail_service: MailService = Depends(get_mail_service)
@@ -130,7 +132,7 @@ async def send_application(
         )
 
 
-@router.get("/status/{application_id}", response_model=ApplicationStatusResponse)
+@router.get("/status/{application_id}", response_model=ApplicationStatusResponse, dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
 async def get_application_status(
     application_id: str,
     mail_service: MailService = Depends(get_mail_service)
@@ -154,7 +156,7 @@ async def get_application_status(
         )
 
 
-@router.get("/sent-today/{user_id}", response_model=SentTodayResponse)
+@router.get("/sent-today/{user_id}", response_model=SentTodayResponse, dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
 async def get_sent_today(
     user_id: str,
     mail_service: MailService = Depends(get_mail_service)

@@ -1,6 +1,5 @@
 """FastAPI dependency injection helpers."""
 
-import boto3
 from typing import AsyncGenerator
 
 from fastapi import Depends
@@ -65,7 +64,15 @@ async def get_mail_service(
     variant_registry: PostgresVariantRepository = Depends(get_variant_registry),
     application_log: PostgresApplicationRepository = Depends(get_application_log),
 ) -> MailService:
-    s3_client = boto3.client("s3")
+    import boto3
+    scheme = "https" if settings.minio.minio_secure else "http"
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+        aws_access_key_id=settings.minio.minio_access_key,
+        aws_secret_access_key=settings.minio.minio_secret_key,
+        region_name="us-east-1",  # required by boto3, ignored by MinIO
+    )
     return MailService(
         mail_bridge_url=settings.mail.mail_bridge_url,
         mail_bridge_api_key=settings.mail.mail_bridge_api_key,
@@ -75,3 +82,6 @@ async def get_mail_service(
         s3_client=s3_client,
         max_applications_per_day=settings.api.max_applications_per_day,
     )
+
+# ── Auth dependencies (re-exported from auth module) ─────────────────────────
+from orchestration.auth.dependencies import get_current_user, require_role  # noqa: F401, E402
