@@ -1,0 +1,197 @@
+"""Resume upload endpoint — POST /api/resume/upload"""
+
+from __future__ import annotations
+
+import asyncio
+import re
+import tempfile
+from pathlib import Path
+
+import boto3
+from botocore.exceptions import ClientError
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from orchestration.api.config import get_settings
+from orchestration.api.dependencies import get_db_session
+from orchestration.auth.dependencies import get_current_user, require_role
+from orchestration.auth.models.user import RoleEnum, UserRecord
+
+router = APIRouter()
+
+ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+ALLOWED_CONTENT_TYPES = {
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+MAX_FILE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+# Magic byte signatures
+MAGIC_BYTES: dict[str, bytes] = {
+    ".pdf": b"%PDF",
+    ".docx": b"PK\x03\x04",
+}
+
+# Malicious PDF patterns — CVE-known vectors
+_PDF_MALICIOUS_PATTERNS = [
+    b"/JavaScript",
+    b"/JS ",
+    b"/OpenAction",
+    b"/Launch",
+    b"/EmbeddedFile",
+    b"/AA ",          # Additional Actions
+    b"/RichMedia",
+    b"eval(",
+]
+
+# Filename sanitizer: allow only safe characters
+_SAFE_FILENAME = re.compile(r"^[a-zA-Z0-9_\-. ]{1,200}$")
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip path components and validate character set."""
+    name = Path(name).name  # drop any directory prefix
+    name = name.replace("\x00", "")  # strip null bytes
+    if not _SAFE_FILENAME.match(name):
+        # Replace unsafe chars with underscore
+        name = re.sub(r"[^a-zA-Z0-9_\-. ]", "_", name)
+    return name
+
+
+def _validate_magic(ext: str, header: bytes) -> bool:
+    expected = MAGIC_BYTES.get(ext)
+    if not expected:
+        return False
+    return header[: len(expected)] == expected
+
+
+def _scan_pdf_threats(content: bytes) -> str | None:
+    """Return a description if a known malicious pattern is found."""
+    sample = content[:65536]  # scan first 64 KB
+    for pattern in _PDF_MALICIOUS_PATTERNS:
+        if pattern in sample:
+            return f"Unsafe pattern detected: {pattern.decode(errors='replace')}"
+    return None
+
+
+def _scan_docx_threats(content: bytes) -> str | None:
+    """
+    DOCX is a ZIP. Reject if it contains macros (vbaProject.bin)
+    or external relationships that could execute code.
+    """
+    import zipfile
+    import io
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            names = zf.namelist()
+            for name in names:
+                lower = name.lower()
+                if "vbaproject.bin" in lower:
+                    return "Document contains VBA macros and cannot be uploaded."
+                if "externallinks" in lower:
+                    return "Document contains external links and cannot be uploaded."
+    except zipfile.BadZipFile:
+        return "File is not a valid DOCX archive."
+    return None
+
+
+class ResumeUploadResponse(BaseModel):
+    s3_key: str
+    file_name: str
+
+
+@router.post(
+    "/upload",
+    response_model=ResumeUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def upload_resume(
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    current_user: UserRecord = Depends(get_current_user),
+    _session: AsyncSession = Depends(get_db_session),
+) -> ResumeUploadResponse:
+    """Upload a master resume (PDF or DOCX) to MinIO.
+
+    Security checks applied in order:
+    1. Extension whitelist (.pdf, .docx only)
+    2. Content-Type whitelist
+    3. File size cap (10 MB)
+    4. Magic byte verification (prevents MIME spoofing)
+    5. Malicious content scan (CVE-known PDF/DOCX vectors)
+    6. Filename sanitization (path traversal, null bytes, unsafe chars)
+    """
+    # 1. User may only upload for themselves
+    if user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot upload resume for another user.")
+
+    # 2. Extension check
+    original_name = file.filename or "resume"
+    sanitized_name = _sanitize_filename(original_name)
+    ext = Path(sanitized_name).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed.")
+
+    # 3. Content-Type check
+    content_type = (file.content_type or "").split(";")[0].strip()
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid content type.")
+
+    # 4. Read file — enforce size cap
+    content = await file.read()
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit.")
+    if len(content) < 4:
+        raise HTTPException(status_code=400, detail="File is too small to be valid.")
+
+    # 5. Magic byte verification
+    if not _validate_magic(ext, content):
+        raise HTTPException(
+            status_code=400,
+            detail="File content does not match its declared extension.",
+        )
+
+    # 6. Threat scan
+    threat: str | None = None
+    if ext == ".pdf":
+        threat = _scan_pdf_threats(content)
+    elif ext == ".docx":
+        threat = _scan_docx_threats(content)
+    if threat:
+        raise HTTPException(status_code=400, detail=threat)
+
+    # 7. Upload to MinIO
+    settings = get_settings()
+    s3_key = f"resumes/{user_id}/{sanitized_name}"
+    scheme = "https" if settings.minio.minio_secure else "http"
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+        aws_access_key_id=settings.minio.minio_access_key,
+        aws_secret_access_key=settings.minio.minio_secret_key,
+        region_name="us-east-1",
+    )
+
+    try:
+        content_type_upload = (
+            "application/pdf"
+            if ext == ".pdf"
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: s3_client.put_object(
+                Bucket=settings.minio.minio_bucket,
+                Key=s3_key,
+                Body=content,
+                ContentType=content_type_upload,
+            ),
+        )
+    except ClientError as exc:
+        raise HTTPException(status_code=500, detail=f"Storage upload failed: {exc}") from exc
+
+    return ResumeUploadResponse(s3_key=s3_key, file_name=sanitized_name)

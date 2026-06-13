@@ -1,18 +1,19 @@
 # JobHunter Orchestration API
 
-FastAPI service that orchestrates the scraper, job inventory, AI resume pipeline, mail sending, and admin monitoring for JobHunter Phase 0.
+FastAPI service that orchestrates the scraper, job inventory, AI resume pipeline, mail sending, and admin monitoring for JobHunter.
 
-> **Port:** 8000 | **Phase:** 0 | **Status:** Complete
+> **Port:** 8000 | **Phase:** 1 | **Status:** Complete
 
 ---
 
 ## Quick Start
 
 ```bash
-cd orchestration/
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
+# Run from the project root (JobHunter/)
+python3 -m venv orchestration/.venv
+source orchestration/.venv/bin/activate
+pip install -r orchestration/requirements.txt
+cp orchestration/.env.example orchestration/.env
 uvicorn orchestration.api.main:app --reload --port 8000
 # Swagger UI: http://localhost:8000/docs
 # Admin Dashboard: http://localhost:8000/admin
@@ -36,6 +37,7 @@ uvicorn orchestration.api.main:app --reload --port 8000
 | GET | `/api/ai/preview/{variant_id}` | Preview curated resume before approving |
 | POST | `/api/ai/approve/{variant_id}` | Approve variant via signed token |
 | POST | `/api/ai/reject/{variant_id}` | Reject variant with optional feedback |
+| POST | `/api/resume/upload` | Upload master resume (PDF/DOCX) to MinIO — hunter/admin only |
 | POST | `/api/mail/send` | Send job application email via Mail-Bridge |
 | GET | `/api/mail/status/{application_id}` | Get application send status |
 | GET | `/api/mail/sent-today/{user_id}` | Applications sent by user in last 24h |
@@ -58,6 +60,7 @@ orchestration/
 │   └── routes/
 │       ├── scraper.py   # /api/scraper/* endpoints
 │       ├── ai.py        # /api/ai/* endpoints
+│       ├── resume.py    # /api/resume/upload endpoint
 │       ├── mail.py      # /api/mail/* endpoints
 │       ├── admin.py     # /api/admin/* endpoints
 │       └── health.py    # /health and /readiness endpoints
@@ -112,6 +115,7 @@ Apply schema:
 
 ```bash
 psql -U jobhunter -d jobhunter -f db/migrations/001_init_schema.sql
+psql -U jobhunter -d jobhunter -f db/migrations/002_auth_schema.sql
 ```
 
 ---
@@ -169,8 +173,9 @@ Accessible at `http://localhost:8000/admin`. Auto-refreshes every 30 seconds.
 ## Running Tests
 
 ```bash
-cd orchestration/
-PYTHONPATH=.. .venv/bin/pytest tests/ -v   # 40 tests
+# From project root (JobHunter/)
+source orchestration/.venv/bin/activate
+PYTHONPATH=. orchestration/.venv/bin/pytest orchestration/tests/ -v   # 40 tests
 ```
 
 ---
@@ -178,7 +183,9 @@ PYTHONPATH=.. .venv/bin/pytest tests/ -v   # 40 tests
 ## Code Quality
 
 ```bash
-.venv/bin/flake8 . --exclude=.venv --max-line-length=100   # 0 errors
+# From project root (JobHunter/)
+source orchestration/.venv/bin/activate
+orchestration/.venv/bin/flake8 orchestration/ --exclude=orchestration/.venv --max-line-length=100   # 0 errors
 ```
 
 ---

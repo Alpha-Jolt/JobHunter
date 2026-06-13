@@ -14,4 +14,5 @@ pytest==8.3.5
 pytest-asyncio==0.26.0
 pytest-cov==6.1.0
 httpx==0.28.1
+python-multipart==0.0.20
 jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.2.1
