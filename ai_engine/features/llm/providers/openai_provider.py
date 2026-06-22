@@ -27,7 +27,7 @@ class OpenAIProvider(LLMProvider):
 
     def __init__(self, api_key: str) -> None:
         try:
-            from openai import AsyncOpenAI  # noqa: PLC0415
+            from openai import AsyncOpenAI  # type: ignore # noqa: PLC0415
 
             self._client = AsyncOpenAI(api_key=api_key)
         except ImportError as exc:
@@ -51,7 +51,7 @@ class OpenAIProvider(LLMProvider):
         max_retries: int = 3,
     ) -> LLMResult:
         """Send prompt to GPT and return structured JSON response."""
-        from openai import APIStatusError  # noqa: PLC0415
+        from openai import APIStatusError  # type: ignore # noqa: PLC0415
 
         schema_instruction = (
             f"\n\nRespond with JSON matching this schema:\n{json.dumps(output_schema, indent=2)}"

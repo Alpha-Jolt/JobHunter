@@ -124,6 +124,23 @@ services:
     networks:
       - jobhunter_network
 
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_APP_URL: http://localhost:3000
+    container_name: jobhunter-webapp
+    environment:
+      INTERNAL_API_URL: http://jobhunter-api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - jobhunter-api
+    networks:
+      - jobhunter_network
+
   # mail-bridge:
   #   build:
   #     context: ../Mail-Engine/Mail-Bridge

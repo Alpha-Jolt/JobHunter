@@ -26,7 +26,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: str) -> None:
         try:
-            import anthropic  # noqa: PLC0415
+            import anthropic  # type: ignore # noqa: PLC0415
 
             self._client = anthropic.AsyncAnthropic(api_key=api_key)
         except ImportError as exc:
@@ -66,7 +66,7 @@ class AnthropicProvider(LLMProvider):
             SchemaValidationError: When response JSON is invalid.
             ProviderError: On other failures.
         """
-        import anthropic  # noqa: PLC0415
+        import anthropic  # type: ignore # noqa: PLC0415
 
         system_msg = (
             "You are a precise JSON-only assistant. "

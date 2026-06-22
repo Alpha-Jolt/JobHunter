@@ -223,6 +223,7 @@ __marimo__/
 .vscode
 .antigravity
 .claude
+.opencode
 .kilo
 implementation
 

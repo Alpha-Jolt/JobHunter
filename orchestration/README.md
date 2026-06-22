@@ -118,6 +118,14 @@ psql -U jobhunter -d jobhunter -f db/migrations/001_init_schema.sql
 psql -U jobhunter -d jobhunter -f db/migrations/002_auth_schema.sql
 ```
 
+Run Migration in container:
+
+```bash
+docker cp orchestration/db/migrations/. jobhunter-postgres:/tmp/
+docker exec -it jobhunter-postgres psql -U jobhunter -d jobhunter -f /tmp/001_init_schema.sql
+docker exec -it jobhunter-postgres psql -U jobhunter -d jobhunter -f /tmp/002_auth_schema.sql
+```
+
 ---
 
 ## Configuration
@@ -132,6 +140,7 @@ Copy `.env.example` to `.env`.
 | `LOG_LEVEL` | `INFO` | Log verbosity |
 | `SECRET_KEY_APPROVAL` | (required) | HMAC key for approval tokens |
 | `APPROVAL_TOKEN_SECRET` | (required, ≥32 chars) | HMAC-SHA256 key for email approval tokens |
+| `COOKIE_SECURE` | `false` | Enforce Secure flag on refresh_token cookie (set true in production/HTTPS) |
 | `MAX_APPLICATIONS_PER_DAY` | `10` | Daily application rate limit per user |
 | `MAX_VARIANTS_PER_SESSION` | `15` | Per-session variant cap |
 | `MAX_VARIANTS_TOTAL` | `50` | Global variant cap per user |

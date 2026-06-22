@@ -26,7 +26,7 @@ class GeminiProvider(LLMProvider):
 
     def __init__(self, api_key: str) -> None:
         try:
-            import google.generativeai as genai  # noqa: PLC0415
+            import google.generativeai as genai  # type: ignore # noqa: PLC0415
 
             genai.configure(api_key=api_key)
             self._genai = genai

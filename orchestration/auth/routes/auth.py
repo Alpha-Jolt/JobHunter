@@ -52,19 +52,20 @@ def _make_service(session: AsyncSession) -> AuthService:
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
+    s = get_settings()
     response.set_cookie(
         key=_REFRESH_COOKIE,
         value=token,
         httponly=True,
-        secure=True,
+        secure=s.auth.cookie_secure,
         samesite="lax",
         max_age=_COOKIE_MAX_AGE,
-        path="/api/auth",
+        path="/",
     )
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=_REFRESH_COOKIE, path="/api/auth")
+    response.delete_cookie(key=_REFRESH_COOKIE, path="/")
 
 
 def _user_to_dict(user: UserRecord) -> dict:
