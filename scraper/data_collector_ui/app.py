@@ -6,9 +6,21 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from scraper.config import config
 from data_collector_ui.routes import router
 
-app = FastAPI(title="JobHunter Data Collector")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if config.use_database:
+        from scraper.db.connection import init_db, dispose_db
+        init_db(config.database_url, pool_size=config.db_pool_size)
+    yield
+    if config.use_database:
+        await dispose_db()
+
+app = FastAPI(title="JobHunter Data Collector", lifespan=lifespan)
 
 _STATIC = Path(__file__).parent / "static"
 if _STATIC.exists():

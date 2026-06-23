@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ai_engine/requirements.txt ./ai_engine/requirements.txt
 
-RUN pip install --no-cache-dir -r ai_engine/requirements.txt
+RUN pip install --no-cache-dir --timeout 300 --retries 5 -r ai_engine/requirements.txt
 
 COPY ai_engine/ ./ai_engine/
 

@@ -55,22 +55,22 @@ export function DashboardMetricsGrid() {
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <MetricCard
         label="Active Jobs"
-        value={Object.values(metrics.jobs_by_source).reduce((a, b) => a + b, 0)}
+        value={Object.values(metrics.jobs.by_source).reduce((a, b) => a + b, 0)}
         icon={<Briefcase className="h-5 w-5" />}
       />
       <MetricCard
         label="Pending Variants"
-        value={metrics.variants_pending}
+        value={metrics.variants.pending}
         icon={<Layers className="h-5 w-5" />}
       />
       <MetricCard
         label="Applications Today"
-        value={metrics.applications_today}
+        value={metrics.applications.sent_today}
         icon={<Send className="h-5 w-5" />}
       />
       <MetricCard
         label="Total Sent"
-        value={metrics.applications_total}
+        value={metrics.applications.total}
         icon={<Clock className="h-5 w-5" />}
       />
     </div>

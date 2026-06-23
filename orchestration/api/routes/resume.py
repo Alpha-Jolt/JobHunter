@@ -181,16 +181,30 @@ async def upload_resume(
             if ext == ".pdf"
             else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: s3_client.put_object(
-                Bucket=settings.minio.minio_bucket,
+        bucket_name = settings.minio.minio_bucket
+
+        def _upload_to_minio():
+            # Check and create bucket if missing
+            try:
+                s3_client.head_bucket(Bucket=bucket_name)
+            except ClientError as e:
+                error_code = e.response.get("Error", {}).get("Code")
+                # MinIO / S3 returns 404 or NoSuchBucket
+                if str(error_code) in ("404", "NoSuchBucket"):
+                    s3_client.create_bucket(Bucket=bucket_name)
+                else:
+                    raise
+
+            # Upload the file
+            s3_client.put_object(
+                Bucket=bucket_name,
                 Key=s3_key,
                 Body=content,
                 ContentType=content_type_upload,
-            ),
-        )
+            )
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _upload_to_minio)
     except ClientError as exc:
         raise HTTPException(status_code=500, detail=f"Storage upload failed: {exc}") from exc
 

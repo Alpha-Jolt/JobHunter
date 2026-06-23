@@ -134,6 +134,19 @@ class RejectVariantResponse(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+@router.get(
+    "/jobs/raw",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.ADMIN, RoleEnum.HUNTER))]
+)
+async def get_raw_jobs(
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Fetch raw jobs for the AI engine to process."""
+    job_repo = PostgresJobRepository(session)
+    jobs = await job_repo.get_by_status("raw")
+    return {"jobs": jobs}
+
 @router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
 async def generate_variant(

@@ -44,12 +44,10 @@ async def run_generate_mode(
 
     # Ingest jobs
     if getattr(config, "use_shared_registry", False):
-        from ai_engine.features.ingestion.readers.registry_reader import (  # noqa: PLC0415
-            read_registry,
+        from ai_engine.features.ingestion.readers.api_reader import (  # noqa: PLC0415
+            read_api,
         )
-
-        registry_path = getattr(config, "shared_jobs_registry_path", "registries/jobs.json")
-        jobs = read_registry(registry_path)
+        jobs = read_api()
         summary = None
     else:
         scraper_files = list(config.scraper_output_dir.glob("*.csv")) + list(

@@ -7,7 +7,6 @@ build/
 .venv/
 venv/
 logs/
-output/
 .pytest_cache/
 .coverage
 htmlcov/

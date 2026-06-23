@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     # Application identity
     app_name: str = Field(default="JobHunter-AIEngine", alias="APP_NAME")
     environment: str = Field(default="development", alias="ENVIRONMENT")
+    orchestration_api_url: str = Field(default="http://jobhunter-api:8000", alias="INTERNAL_API_URL")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 

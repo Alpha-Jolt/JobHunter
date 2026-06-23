@@ -16,3 +16,7 @@ implementation/
 .git/
 .vscode/
 *.md
+.kilo/
+.opencode/
+.mimocode/
+.claude/

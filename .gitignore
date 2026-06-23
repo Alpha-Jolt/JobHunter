@@ -224,6 +224,7 @@ __marimo__/
 .antigravity
 .claude
 .opencode
+.mimocode
 .kilo
 implementation
 
@@ -231,8 +232,3 @@ implementation
 LOGS.md
 SUMMARY.md
 REPORT.md
-
-# scripts
-scripts
-# Runtime registry data
-registries/*.json

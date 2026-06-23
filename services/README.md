@@ -1,4 +1,4 @@
-# JobHunter Services
+# JobHunter Services (Deprecated)
 
 This directory contains standalone FastAPI services that expose internal libraries as REST APIs.
 

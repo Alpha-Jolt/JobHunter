@@ -26,7 +26,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 @router.get("/dashboard/metrics",
-    dependencies=[Depends(require_role(RoleEnum.ADMIN))])
+    dependencies=[Depends(require_role(RoleEnum.ADMIN, RoleEnum.HUNTER))])
 async def get_metrics(
     session: AsyncSession = Depends(get_db_session),
     job_registry: PostgresJobRepository = Depends(get_job_registry),

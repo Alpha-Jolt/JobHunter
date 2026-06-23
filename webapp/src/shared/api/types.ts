@@ -140,11 +140,22 @@ export interface SentTodayResponse {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export interface DashboardMetrics {
-  jobs_by_source: Record<string, number>;
-  variants_total: number;
-  variants_pending: number;
-  variants_approved: number;
-  applications_total: number;
-  applications_today: number;
-  last_scraper_run: string | null;
+  timestamp: string;
+  jobs: {
+    total: number;
+    by_source: Record<string, number>;
+  };
+  variants: {
+    total: number;
+    pending: number;
+    approved: number;
+  };
+  applications: {
+    total: number;
+    sent_today: number;
+  };
+  scraper: {
+    last_run: string | null;
+    last_status: string;
+  };
 }
