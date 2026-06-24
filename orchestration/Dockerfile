@@ -4,10 +4,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /
 
 WORKDIR /app
 
-COPY orchestration/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY orchestration/requirements.txt ./orchestration_requirements.txt
+COPY ai_engine/requirements.txt ./ai_engine_requirements.txt
+RUN pip install --no-cache-dir -r orchestration_requirements.txt -r ai_engine_requirements.txt
 
 COPY orchestration/ ./orchestration/
+COPY ai_engine/ ./ai_engine/
 
 ENV PYTHONPATH=/app
 

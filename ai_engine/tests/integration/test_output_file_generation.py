@@ -32,18 +32,14 @@ def _make_variant(job_id: str = "job-001") -> OptimisedVariant:
 @pytest.mark.asyncio
 async def test_release_mode_skips_unapproved(tmp_path: Path, prompts_dir: Path):
     """Release mode skips unapproved variants and reports them as errors."""
-    from ai_engine.features.llm.prompting.prompt_loader import PromptLoader  # noqa: PLC0415
-    from ai_engine.features.llm.prompting.registry import PromptRegistry  # noqa: PLC0415
     from ai_engine.features.orchestration.modes.release_mode import (
         run_release_mode,
-    )  # noqa: PLC0415
-    from ai_engine.features.output.output_builder import OutputBuilder  # noqa: PLC0415
-    from ai_engine.features.output.strategies.llm_cover_letter_strategy import (  # noqa: PLC0415
-        LLMCoverLetterStrategy,
     )
+    from ai_engine.core.config import get_settings
+    from ai_engine.features.orchestration.builder import PipelineBuilder
 
     registry = JSONRegistry(tmp_path / "registry.json")
-    registry.create(
+    await registry.save(
         VariantRecord(
             variant_id="v-pending",
             job_id="job-001",
@@ -52,7 +48,6 @@ async def test_release_mode_skips_unapproved(tmp_path: Path, prompts_dir: Path):
         )
     )
 
-    gate = ApprovalGate(registry)
     mock_router = MagicMock()
     mock_router.complete = AsyncMock(
         return_value=LLMResult(
@@ -61,14 +56,19 @@ async def test_release_mode_skips_unapproved(tmp_path: Path, prompts_dir: Path):
             model="mock",
         )
     )
-    cover_strategy = LLMCoverLetterStrategy(
-        mock_router, PromptLoader(prompts_dir), PromptRegistry(prompts_dir)
-    )
-    builder = OutputBuilder(gate, cover_strategy, tmp_path / "output")
+
+    settings = get_settings()
+    settings.paths.prompts_dir = prompts_dir
+    settings.paths.output_dir = tmp_path / "output"
+
+    from unittest.mock import patch
+    with patch("ai_engine.features.orchestration.builder.LLMRouter", return_value=mock_router):
+        builder = PipelineBuilder(settings)
+        pipeline = builder.build(variant_registry=registry)
 
     result = await run_release_mode(
         variant_jobs=[("v-pending", _make_variant(), SAMPLE_JOB_ANALYSIS, SAMPLE_JOB_CLEAR)],
-        output_builder=builder,
+        output_builder=pipeline._executor._output_builder,
     )
 
     assert result.output_packages == 0

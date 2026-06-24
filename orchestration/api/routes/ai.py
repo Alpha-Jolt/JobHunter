@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import uuid
 from typing import Optional
+import os
+import shutil
+import tempfile
+import asyncio
+import boto3
+from botocore.exceptions import ClientError
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from orchestration.auth.dependencies import require_role
@@ -57,6 +64,13 @@ def _get_ai_service(session: AsyncSession) -> AIService:
     )
     storage_svc = StorageService(output_dir=settings.paths.ai_resume_dir)
 
+    from ai_engine.core.config import get_settings as get_ai_settings
+    from ai_engine.features.orchestration.builder import PipelineBuilder
+
+    ai_settings = get_ai_settings()
+    builder = PipelineBuilder(ai_settings)
+    ai_pipeline = builder.build(variant_registry=variant_repo)
+
     # ai_pipeline is None in Phase 0 — generate_variant handles it
     return AIService(
         variant_registry=variant_repo,
@@ -64,7 +78,7 @@ def _get_ai_service(session: AsyncSession) -> AIService:
         master_resume_registry=master_resume_repo,
         approval_service=approval_svc,
         storage_service=storage_svc,
-        ai_pipeline=None,
+        ai_pipeline=ai_pipeline,
     )
 
 
@@ -168,11 +182,39 @@ async def generate_variant(
     except JobNotFoundError:
         raise HTTPException(status_code=404, detail=f"Job not found: {body.job_id}")
 
+    # Download resume from MinIO
+    settings = get_settings()
+    scheme = "https" if settings.minio.minio_secure else "http"
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+        aws_access_key_id=settings.minio.minio_access_key,
+        aws_secret_access_key=settings.minio.minio_secret_key,
+        region_name="us-east-1",
+    )
+    bucket_name = settings.minio.minio_bucket
+    s3_key = body.resume_file_path
+
+    # Preserve filename for the master_resume_registry
+    file_name = Path(s3_key).name
+    temp_dir = tempfile.mkdtemp(dir=os.getcwd())
+    local_resume_path = os.path.join(temp_dir, file_name)
+
+    def _download_from_minio():
+        s3_client.download_file(bucket_name, s3_key, local_resume_path)
+
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _download_from_minio)
+    except ClientError as exc:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise HTTPException(status_code=404, detail=f"Resume file not found in storage: {exc}")
+
     try:
         variant = await ai_service.generate_variant(
             user_id=body.user_id,
             job_id=body.job_id,
-            master_resume_path=body.resume_file_path,
+            master_resume_path=local_resume_path,
             job_record=job_record,
         )
     except ValueError as exc:
@@ -184,6 +226,8 @@ async def generate_variant(
         raise HTTPException(status_code=500, detail=msg)
     except RegistryError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     curated = dict(variant.curated_json or {})
     match_score = float(curated.pop("match_score", 0))

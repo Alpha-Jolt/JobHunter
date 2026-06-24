@@ -12,8 +12,8 @@ from ai_engine.features.matching.models.comparison_result import ComparisonResul
 from ai_engine.features.optimization.models.optimised_variant import OptimisedVariant
 from ai_engine.features.variant_management.limiters.budget_enforcer import BudgetEnforcer
 from ai_engine.features.variant_management.models.variant_record import VariantRecord
-from ai_engine.features.variant_management.registries.json_registry import JSONRegistry
 from ai_engine.features.variant_management.strategies.deduplication import is_duplicate
+from shared.registries.base import VariantRegistryBase
 
 logger = get_logger(__name__)
 
@@ -35,11 +35,11 @@ class VariantManager:
     """Orchestrates variant registration with budget and deduplication checks.
 
     Args:
-        registry: JSONRegistry (or DatabaseRegistry in Phase 0+).
+        registry: VariantRegistryBase instance (from jobhunter-dpl).
         budget_enforcer: BudgetEnforcer instance.
     """
 
-    def __init__(self, registry: JSONRegistry, budget_enforcer: BudgetEnforcer) -> None:
+    def __init__(self, registry: VariantRegistryBase, budget_enforcer: BudgetEnforcer) -> None:
         self._registry = registry
         self._budget = budget_enforcer
 
@@ -65,10 +65,10 @@ class VariantManager:
             VariantBudgetExceededError: If budget is exhausted.
             ValidationError: If duplicate is detected and force_duplicate=False.
         """
-        total_count = self._registry.count_all()
+        total_count = await self._registry.count_by_user(user_id)
         self._budget.consume(total_count)
 
-        existing = self._registry.list_by_job(variant.job_id)
+        existing = await self._registry.get_for_job(uuid.UUID(variant.job_id))
         duplicate = is_duplicate(variant.job_id, existing)
 
         if duplicate and not force_duplicate:
@@ -87,7 +87,7 @@ class VariantManager:
             fabrication_check_result="passed",
             approval_status=ApprovalStatus.PENDING,
         )
-        self._registry.create(record)
+        await self._registry.save(record)
 
         logger.info(
             "variant_manager.registered",
@@ -97,11 +97,11 @@ class VariantManager:
         )
         return RegistrationResult(variant_id=variant_id, is_duplicate=duplicate)
 
-    def update_approval(self, variant_id: str, status: ApprovalStatus) -> None:
+    async def update_approval(self, variant_id: str, status: ApprovalStatus) -> None:
         """Update the approval status of a registered variant.
 
         Args:
             variant_id: Variant identifier.
             status: New approval status.
         """
-        self._registry.update_status(variant_id, status)
+        await self._registry.update_approval_status(uuid.UUID(variant_id), status.value)

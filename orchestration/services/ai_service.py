@@ -206,11 +206,9 @@ class AIService:
         Returns:
             Tuple of (optimised_variant_dict, comparison_result_dict).
         """
-        from ai_engine.features.resume.resume_parser import ResumeParser  # noqa: F401
-        from ai_engine.features.analysis.job_analyser import JobAnalyser  # noqa: F401
-        from ai_engine.features.matching.comparator import Comparator  # noqa: F401
-        from ai_engine.features.optimization.resume_optimiser import ResumeOptimiser  # noqa: F401
-
+        if not self.ai_pipeline:
+            raise AIServiceError("AI Pipeline is not initialized.")
+            
         executor = self.ai_pipeline._executor
 
         try:

@@ -6,6 +6,12 @@ from unittest.mock import AsyncMock, patch, MagicMock
 
 from orchestration.services.mail_service import MailService
 from orchestration.core.exceptions import (
+    ApprovalRequiredError,
+    DuplicateApplicationError,
+    RateLimitError,
+    JobError,
+    MailSendError,
+)
 
 # ── Auth test helpers ─────────────────────────────────────────────────────────
 import uuid as _uuid
@@ -44,13 +50,6 @@ def _patch_auth(user=None):
         "orchestration.auth.dependencies.AuthRepository"
     ), u, tok
 # ─────────────────────────────────────────────────────────────────────────────
-
-    ApprovalRequiredError,
-    DuplicateApplicationError,
-    RateLimitError,
-    JobError,
-    MailSendError,
-)
 
 
 def _make_variant(approval_status="approved"):

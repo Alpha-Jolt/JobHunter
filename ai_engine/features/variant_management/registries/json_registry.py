@@ -9,11 +9,12 @@ from ai_engine.core.exceptions import ValidationError
 from ai_engine.core.logging_.logger import get_logger
 from ai_engine.core.types import ApprovalStatus
 from ai_engine.features.variant_management.models.variant_record import VariantRecord
+from shared.registries.base import VariantRegistryBase
 
 logger = get_logger(__name__)
 
 
-class JSONRegistry:
+class JSONRegistry(VariantRegistryBase):
     """Local JSON file registry for variant records.
 
     Stores all variant metadata in a single JSON file.
@@ -37,7 +38,7 @@ class JSONRegistry:
         """Persist registry to disk."""
         self._path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
 
-    def create(self, record: VariantRecord) -> None:
+    async def save(self, record: VariantRecord) -> None:
         """Register a new variant record.
 
         Args:
@@ -53,7 +54,7 @@ class JSONRegistry:
         self._save(data)
         logger.info("json_registry.created", variant_id=record.variant_id, job_id=record.job_id)
 
-    def get(self, variant_id: str) -> VariantRecord | None:
+    async def get(self, variant_id: str) -> VariantRecord | None:
         """Retrieve a variant record by ID.
 
         Args:
@@ -66,7 +67,7 @@ class JSONRegistry:
         raw = data.get(variant_id)
         return VariantRecord(**raw) if raw else None
 
-    def update_status(self, variant_id: str, status: ApprovalStatus) -> None:
+    async def update_approval_status(self, variant_id: str, status: str) -> None:
         """Update the approval status of a variant.
 
         Args:
@@ -77,13 +78,13 @@ class JSONRegistry:
             ValidationError: If variant_id does not exist.
         """
         data = self._load()
-        if variant_id not in data:
+        if str(variant_id) not in data:
             raise ValidationError(f"Variant {variant_id} not found in registry.")
-        data[variant_id]["approval_status"] = status.value
+        data[str(variant_id)]["approval_status"] = status
         self._save(data)
-        logger.info("json_registry.status_updated", variant_id=variant_id, status=status.value)
+        logger.info("json_registry.status_updated", variant_id=variant_id, status=status)
 
-    def list_by_job(self, job_id: str) -> list[VariantRecord]:
+    async def get_for_job(self, job_id: str) -> list[VariantRecord]:
         """Return all variants for a given job ID.
 
         Args:
@@ -93,9 +94,9 @@ class JSONRegistry:
             List of VariantRecord instances.
         """
         data = self._load()
-        return [VariantRecord(**v) for v in data.values() if v.get("job_id") == job_id]
+        return [VariantRecord(**v) for v in data.values() if str(v.get("job_id")) == str(job_id)]
 
-    def list_by_user(self, user_id: str) -> list[VariantRecord]:
+    async def list_by_user(self, user_id: str) -> list[VariantRecord]:
         """Return all variants for a given user ID.
 
         Args:
@@ -107,6 +108,7 @@ class JSONRegistry:
         data = self._load()
         return [VariantRecord(**v) for v in data.values() if v.get("user_id") == user_id]
 
-    def count_all(self) -> int:
-        """Return total number of registered variants."""
-        return len(self._load())
+    async def count_by_user(self, user_id: str) -> int:
+        """Return total number of registered variants for a user."""
+        data = self._load()
+        return len([v for v in data.values() if v.get("user_id") == user_id])

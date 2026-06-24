@@ -68,22 +68,7 @@ services:
     networks:
       - jobhunter_network
 
-  ai_engine:
-    build:
-      context: .
-      dockerfile: ai_engine/Dockerfile
-    env_file:
-      - ./ai_engine/.env
-    environment:
-      INTERNAL_API_URL: "http://jobhunter-api:8000"
-    volumes:
-      - ./ai_output:/app/ai_output
-      - ./registries:/app/registries
-      - ./scraper/output:/app/output
-    depends_on:
-      - jobhunter-api
-    networks:
-      - jobhunter_network
+
 
   redis:
     image: redis:7-alpine
