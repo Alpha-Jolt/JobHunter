@@ -80,6 +80,7 @@ class DeepSeekProvider(LLMProvider):
                     ) from exc
 
                 usage = response.usage
+                cached = getattr(usage, "prompt_cache_hit_tokens", 0) or 0 if usage else 0
                 return LLMResult(
                     content=parsed,
                     provider=self.provider_name,
@@ -87,6 +88,7 @@ class DeepSeekProvider(LLMProvider):
                     prompt_tokens=usage.prompt_tokens if usage else 0,
                     completion_tokens=usage.completion_tokens if usage else 0,
                     latency_seconds=elapsed,
+                    cache_read_tokens=cached,
                 )
 
             except APIStatusError as exc:

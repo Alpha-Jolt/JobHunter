@@ -22,26 +22,26 @@ def read_api() -> list[JobRecord]:
     api_url = f"{settings.orchestration_api_url.rstrip('/')}/api/ai/jobs/raw"
 
     records: list[JobRecord] = []
-    
+
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.get(api_url)
             response.raise_for_status()
             data = response.json()
-            
+
         jobs_data = data.get("jobs", [])
-        
+
         for job_dict in jobs_data:
             try:
                 # Convert string timestamps back to datetime if necessary
                 posted_at = job_dict.get("posted_at")
                 if posted_at and isinstance(posted_at, str):
                     posted_at = datetime.fromisoformat(posted_at.replace("Z", "+00:00"))
-                    
+
                 scraped_at = job_dict.get("scraped_at")
                 if scraped_at and isinstance(scraped_at, str):
                     scraped_at = datetime.fromisoformat(scraped_at.replace("Z", "+00:00"))
-                
+
                 records.append(JobRecord(
                     job_id=str(job_dict.get("job_id", "")),
                     source=job_dict.get("source", ""),
@@ -58,7 +58,7 @@ def read_api() -> list[JobRecord]:
                 ))
             except Exception as exc:
                 logger.warning("api_reader.skipped", job_id=job_dict.get("job_id"), error=str(exc))
-                
+
     except Exception as exc:
         logger.error("api_reader.request_failed", url=api_url, error=str(exc))
         return []

@@ -1,14 +1,14 @@
 You are an expert cover letter writer. Write a professional cover letter for the candidate applying to this role.
 
 Job Analysis:
----
+<user_data>
 $job_analysis
----
+</user_data>
 
 Optimised Resume Variant:
----
+<user_data>
 $optimised_variant
----
+</user_data>
 
 CRITICAL RULES:
 1. Use ONLY information from the optimised resume variant above.

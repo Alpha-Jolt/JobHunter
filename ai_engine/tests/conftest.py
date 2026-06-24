@@ -60,11 +60,11 @@ def prompts_dir(tmp_path: Path) -> Path:
     prompts = tmp_path / "prompts"
     prompts.mkdir()
     for name in [
-        "job_analyser_v1",
-        "resume_parser_v1",
-        "comparison_engine_v1",
-        "resume_optimiser_v1",
-        "cover_letter_v1",
+        "job_analyser_v1.1.0",
+        "resume_parser_v1.1.0",
+        "comparison_engine_v1.1.0",
+        "resume_optimiser_v1.1.0",
+        "cover_letter_v1.1.0",
     ]:
         (prompts / f"{name}.txt").write_text(
             f"Test prompt for {name}. Job: $job_description", encoding="utf-8"

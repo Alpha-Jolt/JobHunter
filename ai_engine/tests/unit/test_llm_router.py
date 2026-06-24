@@ -17,12 +17,13 @@ def _make_settings(primary: ProviderType = ProviderType.ANTHROPIC, fallbacks: li
     settings.primary_provider = primary
     settings.fallback_providers = fallbacks or [ProviderType.OPENAI]
     settings.max_retries = 1
-    settings.anthropic_api_key = "test"
-    settings.openai_api_key = "test"
-    settings.gemini_api_key = "test"
-    settings.deepseek_api_key = "test"
-    settings.grok_api_key = "test"
-    settings.openrouter_api_key = "test"
+    from pydantic import SecretStr
+    settings.anthropic_api_key = SecretStr("test")
+    settings.openai_api_key = SecretStr("test")
+    settings.gemini_api_key = SecretStr("test")
+    settings.deepseek_api_key = SecretStr("test")
+    settings.grok_api_key = SecretStr("test")
+    settings.openrouter_api_key = SecretStr("test")
     settings.openrouter_model = "openai/gpt-4o-mini"
     return settings
 

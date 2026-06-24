@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Self
 
 from ai_engine.core.types import ProviderType
 
@@ -24,12 +25,12 @@ class LLMSettings(BaseSettings):
     timeout_seconds: int = Field(default=60, ge=5, le=300)
 
     # Provider API keys
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
-    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
-    deepseek_api_key: str = Field(default="", alias="DEEPSEEK_API_KEY")
-    grok_api_key: str = Field(default="", alias="GROK_API_KEY")
-    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    anthropic_api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
+    openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
+    gemini_api_key: SecretStr = Field(default=SecretStr(""), alias="GEMINI_API_KEY")
+    deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
+    grok_api_key: SecretStr = Field(default=SecretStr(""), alias="GROK_API_KEY")
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="openai/gpt-4o-mini", alias="OPENROUTER_MODEL")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
@@ -93,11 +94,36 @@ class MinIOSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MINIO_", env_file=".env", extra="ignore")
 
     endpoint: str = Field(default="localhost:9000")
-    access_key: str = Field(default="minioadmin")
-    secret_key: str = Field(default="minioadmin")
+    access_key: SecretStr = Field(default=SecretStr(""))
+    secret_key: SecretStr = Field(default=SecretStr(""))
     bucket_name: str = Field(default="jobhunter-resumes")
-    use_ssl: bool = Field(default=False)
+    use_ssl: bool = Field(default=True)
     enabled: bool = Field(default=True)
+
+
+class ApprovalSettings(BaseSettings):
+    """Approval token HMAC key ring configuration."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="APPROVAL_", env_file=".env", extra="ignore"
+    )
+
+    # JSON string: {"k1": "secret1", "k2": "secret2"}
+    keys_json: SecretStr = Field(alias="APPROVAL_KEYS")
+    active_key_id: str = Field(alias="APPROVAL_ACTIVE_KEY")
+
+    @property
+    def keyring(self) -> dict[str, str]:
+        """Parse keys_json into {key_id: raw_secret} dict."""
+        import json
+        raw = json.loads(self.keys_json.get_secret_value())
+        if not isinstance(raw, dict) or not raw:
+            raise ValueError("APPROVAL_KEYS must be a non-empty JSON object.")
+        if self.active_key_id not in raw:
+            raise ValueError(
+                f"APPROVAL_ACTIVE_KEY '{self.active_key_id}' not found in APPROVAL_KEYS."
+            )
+        return raw
 
 
 class Settings(BaseSettings):
@@ -110,11 +136,34 @@ class Settings(BaseSettings):
     variants: VariantSettings = Field(default_factory=VariantSettings)
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     minio: MinIOSettings = Field(default_factory=MinIOSettings)
+    approval: ApprovalSettings = Field(default_factory=ApprovalSettings)
 
     # Application identity
     app_name: str = Field(default="JobHunter-AIEngine", alias="APP_NAME")
     environment: str = Field(default="development", alias="ENVIRONMENT")
-    orchestration_api_url: str = Field(default="http://jobhunter-api:8000", alias="INTERNAL_API_URL")
+    orchestration_api_url: str = Field(
+        default="https://jobhunter-api:8000", alias="INTERNAL_API_URL"
+    )
+
+    @model_validator(mode="after")
+    def _enforce_https_on_production(self) -> Self:
+        """Refuse to start if HTTP is used outside a development environment."""
+        is_dev = self.environment.lower() in {"development", "local", "dev"}
+        url_is_http = self.orchestration_api_url.startswith("http://")
+        minio_no_ssl = self.minio.enabled and not self.minio.use_ssl
+
+        if not is_dev and (url_is_http or minio_no_ssl):
+            problems = []
+            if url_is_http:
+                problems.append(f"orchestration_api_url uses HTTP: {self.orchestration_api_url}")
+            if minio_no_ssl:
+                problems.append("MinIO use_ssl=False on non-development environment")
+            raise ValueError(
+                "Insecure HTTP configuration detected on non-development environment. "
+                f"Problems: {'; '.join(problems)}. "
+                "Set ENVIRONMENT=development to override, or fix your URLs."
+            )
+        return self
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 

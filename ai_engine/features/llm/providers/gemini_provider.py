@@ -88,6 +88,7 @@ class GeminiProvider(LLMProvider):
                     provider=self.provider_name,
                     model=_MODEL,
                     latency_seconds=elapsed,
+                    cache_read_tokens=0,
                 )
 
             except SchemaValidationError:

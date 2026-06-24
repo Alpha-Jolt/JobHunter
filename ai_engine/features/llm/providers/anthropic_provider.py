@@ -43,6 +43,10 @@ class AnthropicProvider(LLMProvider):
     def model_name(self) -> str:
         return _MODEL
 
+    @property
+    def supports_caching(self) -> bool:
+        return True
+
     async def complete(
         self,
         prompt: str,
@@ -68,6 +72,8 @@ class AnthropicProvider(LLMProvider):
         """
         import anthropic  # type: ignore # noqa: PLC0415
 
+        from ai_engine.features.llm.caching.prompt_cache_manager import split_prompt
+
         system_msg = (
             "You are a precise JSON-only assistant. "
             "Respond ONLY with valid JSON matching the provided schema. "
@@ -79,14 +85,37 @@ class AnthropicProvider(LLMProvider):
 
         start = time.monotonic()
         last_error: Exception | None = None
+        parts = split_prompt(prompt)
 
         for attempt in range(max_retries):
             try:
                 response = await self._client.messages.create(
                     model=_MODEL,
                     max_tokens=4096,
-                    system=system_msg,
-                    messages=[{"role": "user", "content": prompt + schema_instruction}],
+                    system=[
+                        {
+                            "type": "text",
+                            "text": system_msg,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": parts.preamble + schema_instruction,
+                                    "cache_control": {"type": "ephemeral"},
+                                },
+                                {
+                                    "type": "text",
+                                    "text": parts.user_content,
+                                },
+                            ],
+                        }
+                    ],
+                    betas=["prompt-caching-2024-07-31"],
                 )
                 elapsed = time.monotonic() - start
                 raw_text = response.content[0].text.strip()
@@ -106,6 +135,12 @@ class AnthropicProvider(LLMProvider):
                     prompt_tokens=response.usage.input_tokens,
                     completion_tokens=response.usage.output_tokens,
                     latency_seconds=elapsed,
+                    cache_read_tokens=getattr(
+                        response.usage, "cache_read_input_tokens", 0
+                    ) or 0,
+                    cache_creation_tokens=getattr(
+                        response.usage, "cache_creation_input_tokens", 0
+                    ) or 0,
                 )
 
             except anthropic.RateLimitError as exc:

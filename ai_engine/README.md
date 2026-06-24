@@ -55,6 +55,8 @@ result = await pipeline.run(config)
 - **Approval gate** — no file is written to disk unless the variant is explicitly approved.
 - **Variant budget** — generation stops hard at `MAX_VARIANTS_TOTAL` / `MAX_VARIANTS_PER_SESSION`.
 - **Provider agnosticism** — swap LLM providers by changing one `.env` variable. No code changes.
+- **Prompt Caching** — intelligent cross-provider prompt caching reduces LLM costs and latency for repeated context.
+- **Security First** — robust protections against prompt injection via XML boundaries (`<user_data>`), path traversal prevention, memory-safe API keys (`SecretStr`), and strict HTTPS requirements for production.
 
 ---
 

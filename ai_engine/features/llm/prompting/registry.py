@@ -11,11 +11,11 @@ logger = get_logger(__name__)
 
 # Maps logical prompt key → list of available versions (latest first)
 _PROMPT_VERSIONS: dict[str, list[str]] = {
-    "job_analyser": ["job_analyser_v1"],
-    "resume_parser": ["resume_parser_v1"],
-    "comparison_engine": ["comparison_engine_v1"],
-    "resume_optimiser": ["resume_optimiser_v1"],
-    "cover_letter": ["cover_letter_v1"],
+    "job_analyser": ["job_analyser_v1.1.0"],
+    "resume_parser": ["resume_parser_v1.1.0"],
+    "comparison_engine": ["comparison_engine_v1.1.0"],
+    "resume_optimiser": ["resume_optimiser_v1.1.0"],
+    "cover_letter": ["cover_letter_v1.1.0"],
 }
 
 

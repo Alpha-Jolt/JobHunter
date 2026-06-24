@@ -1,14 +1,14 @@
 You are an expert resume-to-job-description matcher. Compare the candidate's resume against the job requirements.
 
 Job Analysis:
----
+<user_data>
 $job_analysis
----
+</user_data>
 
 Candidate Resume:
----
+<user_data>
 $resume_data
----
+</user_data>
 
 Analyse the match between the candidate and the job. Be objective and precise.
 

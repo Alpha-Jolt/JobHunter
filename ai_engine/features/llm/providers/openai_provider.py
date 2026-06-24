@@ -86,6 +86,14 @@ class OpenAIProvider(LLMProvider):
                     ) from exc
 
                 usage = response.usage
+                cached = 0
+                if (
+                    usage 
+                    and hasattr(usage, "prompt_tokens_details") 
+                    and usage.prompt_tokens_details
+                ):
+                    cached = getattr(usage.prompt_tokens_details, "cached_tokens", 0) or 0
+
                 return LLMResult(
                     content=parsed,
                     provider=self.provider_name,
@@ -93,6 +101,7 @@ class OpenAIProvider(LLMProvider):
                     prompt_tokens=usage.prompt_tokens if usage else 0,
                     completion_tokens=usage.completion_tokens if usage else 0,
                     latency_seconds=elapsed,
+                    cache_read_tokens=cached,
                 )
 
             except APIStatusError as exc:

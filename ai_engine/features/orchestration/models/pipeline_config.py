@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ai_engine.core.types import PipelineMode
 
@@ -31,3 +31,19 @@ class PipelineConfig(BaseModel):
         default_factory=list,
         description="Variant IDs to release in RELEASE mode.",
     )
+
+    @field_validator("resume_file_path", "email_template_path", mode="after")
+    @classmethod
+    def _no_path_traversal(cls, v: Path | None) -> Path | None:
+        if v is None:
+            return v
+        try:
+            resolved = v.resolve()
+            cwd = Path.cwd().resolve()
+            if not str(resolved).startswith(str(cwd)):
+                raise ValueError(
+                    "Path traversal detected: path must be within the working directory."
+                )
+        except Exception as e:
+            raise ValueError(f"Invalid path: {e}")
+        return v

@@ -1,9 +1,9 @@
 You are an expert resume parser. Extract structured information from the following resume text.
 
 Resume Text:
----
+<user_data>
 $resume_text
----
+</user_data>
 
 CRITICAL RULES:
 1. Extract ONLY information explicitly present in the resume text above.

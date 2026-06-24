@@ -1,9 +1,9 @@
 You are an expert job description analyst. Analyse the following job description and extract structured information.
 
 Job Description:
----
+<user_data>
 $job_description
----
+</user_data>
 
 Extract the following information accurately. Do NOT invent or assume information not present in the text.
 

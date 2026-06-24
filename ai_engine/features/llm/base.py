@@ -29,9 +29,18 @@ class LLMResult:
     latency_seconds: float = 0.0
     prompt_version: str = ""
     metadata: dict = field(default_factory=dict)
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
 
 
-class LLMProvider(ABC):
+class CachingMixin:
+    """Provides optional caching properties for LLM providers."""
+    @property
+    def supports_caching(self) -> bool:
+        return False
+
+
+class LLMProvider(CachingMixin, ABC):
     """Abstract base class for all LLM providers.
 
     Every provider must implement ``complete``. Providers handle their own

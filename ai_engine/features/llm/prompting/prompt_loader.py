@@ -34,12 +34,15 @@ class PromptLoader:
         Raises:
             PromptNotFoundError: If the prompt file does not exist.
         """
+        from ai_engine.features.llm.prompting.sanitizer import sanitize_variables
+
         path = self._prompts_dir / f"{name}.txt"
         if not path.exists():
             raise PromptNotFoundError(name)
 
         raw = path.read_text(encoding="utf-8")
-        rendered = Template(raw).safe_substitute(variables or {})
+        safe_vars = sanitize_variables(variables or {})
+        rendered = Template(raw).safe_substitute(safe_vars)
         return rendered, name
 
     def list_available(self) -> list[str]:

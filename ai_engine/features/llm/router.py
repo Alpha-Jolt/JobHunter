@@ -48,13 +48,23 @@ def _build_provider(provider_type: ProviderType, settings: Any) -> LLMProvider:
     )  # noqa: PLC0415
 
     mapping = {
-        ProviderType.ANTHROPIC: lambda: AnthropicProvider(settings.anthropic_api_key),
-        ProviderType.OPENAI: lambda: OpenAIProvider(settings.openai_api_key),
-        ProviderType.GEMINI: lambda: GeminiProvider(settings.gemini_api_key),
-        ProviderType.DEEPSEEK: lambda: DeepSeekProvider(settings.deepseek_api_key),
-        ProviderType.GROK: lambda: GrokProvider(settings.grok_api_key),
+        ProviderType.ANTHROPIC: lambda: AnthropicProvider(
+            settings.anthropic_api_key.get_secret_value()
+        ),
+        ProviderType.OPENAI: lambda: OpenAIProvider(
+            settings.openai_api_key.get_secret_value()
+        ),
+        ProviderType.GEMINI: lambda: GeminiProvider(
+            settings.gemini_api_key.get_secret_value()
+        ),
+        ProviderType.DEEPSEEK: lambda: DeepSeekProvider(
+            settings.deepseek_api_key.get_secret_value()
+        ),
+        ProviderType.GROK: lambda: GrokProvider(
+            settings.grok_api_key.get_secret_value()
+        ),
         ProviderType.OPENROUTER: lambda: OpenRouterProvider(
-            settings.openrouter_api_key, settings.openrouter_model
+            settings.openrouter_api_key.get_secret_value(), settings.openrouter_model
         ),
     }
     factory = mapping.get(provider_type)
@@ -124,6 +134,15 @@ class LLMRouter:
 
                 metrics.increment(f"llm.calls.{provider.provider_name}")
                 metrics.record_latency(f"llm.latency.{provider.provider_name}", elapsed)
+
+                if getattr(result, "cache_read_tokens", 0) > 0:
+                    metrics.increment(
+                        f"llm.cache_hit.{provider.provider_name}", result.cache_read_tokens
+                    )
+                if getattr(result, "cache_creation_tokens", 0) > 0:
+                    metrics.increment(
+                        f"llm.cache_write.{provider.provider_name}", result.cache_creation_tokens
+                    )
 
                 logger.info(
                     "llm_router.success",
