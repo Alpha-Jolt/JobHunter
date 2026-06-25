@@ -15,11 +15,8 @@ python -m dev_mode.dev_runner
 # 3. Run tests
 bash scripts/run_tests.sh
 
-# 4. Admin dashboard
-uvicorn admin_dashboard.app:app --port 8001 --reload
-
-# 5. Data collector UI
-uvicorn data_collector_ui.app:app --port 8002 --reload
+# 4. Run the Redis worker (requires running Redis)
+python -m scraper_worker.worker
 ```
 
 ## Install as package
@@ -32,8 +29,8 @@ pip install -e ".[dev]"
 
 ```bash
 # From the project root
-docker compose -f DOCKER-COMPOSE.yml up --build scraper admin_dashboard data_collector redis
-# scraper on dev_runner, admin on :8001, data collector on :8002
+docker compose up -d --build scraper
+# Worker listens on redis:6379 for tasks on the scraper:tasks queue
 ```
 
 ## Architecture
@@ -134,5 +131,14 @@ python scripts/validate_output.py
 
 - LinkedIn scraper is a stub (returns empty list) — full implementation in Phase 1
 - Indeed Scraper uses playwright-stealth to bypass Cloudflare; may still be blocked on heavily restricted networks
-- Database output raises `NotImplementedError` — PostgreSQL integration in Phase 0+
-- Redis scheduler requires a running Redis instance — not needed for `dev_runner`
+
+## Redis Worker
+
+The `scraper_worker/worker.py` process listens on the `scraper:tasks` Redis queue using `BLPOP`. It runs the full scraper pipeline on each task received.
+
+```bash
+# Requires REDIS_URL set in .env
+python -m scraper_worker.worker
+```
+
+In Docker, this is the default `CMD` for the `scraper` container. Tasks are enqueued by the Admin API (`admin_api/scraper/service.py`) when a scraper is triggered from the Admin Console.

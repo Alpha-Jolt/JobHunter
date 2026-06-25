@@ -12,7 +12,7 @@ services:
       - minio_data:/minio_data
     command: server /minio_data --console-address ":9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,6 +25,7 @@ services:
       dockerfile: scraper/docker/Dockerfile
     env_file:
       - ./scraper/.env
+    restart: unless-stopped
     volumes:
       - ./scraper/output:/app/output
       - ./scraper/logs:/app/logs
@@ -37,35 +38,33 @@ services:
     networks:
       - jobhunter_network
 
-  admin_dashboard:
+  admin:
     build:
-      context: .
-      dockerfile: scraper/docker/Dockerfile
-    env_file:
-      - ./scraper/.env
-    command: ["uvicorn", "admin_dashboard.app:app", "--host", "0.0.0.0", "--port", "8001"]
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_ADMIN_API_URL: http://admin-api:8003
+    container_name: jobhunter-admin
+    environment:
+      NEXT_PUBLIC_ADMIN_API_URL: http://admin-api:8003
     ports:
-      - "8001:8001"
+      - "5001:3001"
+    depends_on:
+      - admin-api
+    networks:
+      - jobhunter_network
+
+  admin-api:
+    build:
+      context: ./admin_api
+      dockerfile: Dockerfile
+    container_name: jobhunter-admin-api
+    env_file:
+      - ./admin_api/.env
     volumes:
-      - ./scraper/output:/app/output
-      - ./scraper/logs:/app/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - jobhunter_network
-
-  data_collector:
-    build:
-      context: .
-      dockerfile: scraper/docker/Dockerfile
-    env_file:
-      - ./scraper/.env
-    command: ["uvicorn", "data_collector_ui.app:app", "--host", "0.0.0.0", "--port", "8002"]
+      - ./scraper/logs:/scraper/logs
     ports:
-      - "8002:8002"
+      - "8003:8003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,18 +72,18 @@ services:
         condition: service_healthy
     networks:
       - jobhunter_network
-
-
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - jobhunter_network
 
   postgres:
     image: postgres:15-alpine
@@ -98,7 +97,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jobhunter -d jobhunter"]
+      test: [ "CMD-SHELL", "pg_isready -U jobhunter -d jobhunter" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -118,7 +117,7 @@ services:
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -145,7 +144,6 @@ services:
         condition: service_healthy
     networks:
       - jobhunter_network
-
   # mail-bridge:
   #   build:
   #     context: ../Mail-Engine/Mail-Bridge
