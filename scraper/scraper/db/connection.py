@@ -38,6 +38,16 @@ async def dispose_db() -> None:
         logger.info("Scraper database engine disposed")
 
 
+async def create_tables() -> None:
+    """Create all database tables."""
+    from scraper.db.models import Base
+    if _engine is None:
+        raise RuntimeError("Engine not initialised")
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created/verified")
+
+
 @asynccontextmanager
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Async context manager yielding a database session."""

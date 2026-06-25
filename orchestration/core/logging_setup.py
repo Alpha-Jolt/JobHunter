@@ -36,6 +36,8 @@ def setup_logging(log_level: str = 'INFO', log_format: str = 'json'):
 
     # File handler (optional)
     try:
+        import os
+        os.makedirs('logs', exist_ok=True)
         file_handler = logging.FileHandler('logs/api.log')
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)

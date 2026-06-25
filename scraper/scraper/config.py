@@ -48,16 +48,16 @@ class Config(BaseSettings):
     sentry_dsn: Optional[str] = None
 
     # --- Redis ---
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = ""
 
     # --- Database ---
     use_database: bool = False
-    database_url: str = "postgresql+asyncpg://jobhunter:jobhunter@localhost:5432/jobhunter"
+    database_url: str = ""
     db_pool_size: int = Field(default=5, ge=1, le=20)
 
     # --- Output ---
     output_dir: Path = Path("output")
-    output_formats: str = "json,csv"
+    output_formats: str = ""
     use_registry: bool = False
     registry_path: str = "registries/jobs.json"
 

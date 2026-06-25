@@ -30,8 +30,10 @@ services:
       - ./scraper/logs:/app/logs
       - ./registries:/app/registries
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - jobhunter_network
 
@@ -48,8 +50,10 @@ services:
       - ./scraper/output:/app/output
       - ./scraper/logs:/app/logs
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - jobhunter_network
 
@@ -63,8 +67,10 @@ services:
     ports:
       - "8002:8002"
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - jobhunter_network
 
@@ -74,6 +80,11 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:15-alpine
@@ -86,6 +97,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobhunter -d jobhunter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - jobhunter_network
 
@@ -101,8 +117,14 @@ services:
       MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - jobhunter_network
 
@@ -119,7 +141,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - jobhunter-api
+      jobhunter-api:
+        condition: service_healthy
     networks:
       - jobhunter_network
 

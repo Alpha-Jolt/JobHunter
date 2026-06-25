@@ -52,7 +52,7 @@ Scheduler → Worker → Scraper → Extraction → Cleaning → Normalization �
 
 ## Output
 
-Jobs are written to `output/final/` as timestamped JSON and CSV files.
+Jobs are written to the database by default. If `OUTPUT_FORMATS` is set to `json,csv`, they will also be written to `output/final/` as timestamped files.
 
 ## Configuration
 
@@ -67,7 +67,7 @@ Copy `.env.example` to `.env` and adjust values. All settings have sensible defa
 | `PAGES_PER_SEARCH` | `5` | Pages scraped per keyword/location |
 | `INDEED_RATE_LIMIT` | `1.0` | Requests/sec for Indeed |
 | `NAUKRI_RATE_LIMIT` | `0.5` | Requests/sec for Naukri |
-| `OUTPUT_FORMATS` | `json,csv` | Output file formats |
+| `OUTPUT_FORMATS` | _(empty)_ | Output file formats (e.g. `json,csv`) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity |
 | `PROXY_LIST` | _(empty)_ | Comma-separated proxy URLs |
 | `USE_REGISTRY` | `false` | Persist jobs to shared `JobRegistry` |
