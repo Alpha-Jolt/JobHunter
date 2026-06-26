@@ -8,6 +8,10 @@ export interface UserRecord {
   last_name: string | null;
   is_active: boolean;
   is_verified: boolean;
+  resume?: {
+    resumeKey: string;
+    resumeFileName: string;
+  } | null;
 }
 
 export interface AuthResponse {
@@ -59,6 +63,10 @@ export interface JobsResponse {
 export interface ResumeUploadResponse {
   s3_key: string;
   file_name: string;
+}
+
+export interface PreviewResumeResponse {
+  url: string;
 }
 
 // ── Variants ──────────────────────────────────────────────────────────────────

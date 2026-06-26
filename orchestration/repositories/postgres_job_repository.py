@@ -94,7 +94,7 @@ class PostgresJobRepository(JobRegistryBase):
                         status=job.status,
                     )
                     .on_conflict_do_update(
-                        constraint="jobs_source_external_id_unique",
+                        index_elements=["source", "external_id"],
                         set_={
                             "title": job.title,
                             "company_name": job.company_name,

@@ -96,6 +96,11 @@ class MinIOConfig(BaseSettings):
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
 
+class RedisConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    
+    redis_url: str = Field(default="redis://jobhunter-redis-1:6379/0", alias="REDIS_URL")
+
 class Settings(BaseSettings):
     """Aggregated application settings."""
 
@@ -108,6 +113,7 @@ class Settings(BaseSettings):
     mail: MailConfig = Field(default_factory=MailConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     minio: MinIOConfig = Field(default_factory=MinIOConfig)
+    redis: RedisConfig = Field(default_factory=RedisConfig)
 
     @field_validator("database", mode="before")
     @classmethod
@@ -143,6 +149,13 @@ class Settings(BaseSettings):
         if isinstance(v, dict):
             return MailConfig(**v)
         return v or MailConfig()
+        
+    @field_validator("redis", mode="before")
+    @classmethod
+    def _build_redis(cls, v):
+        if isinstance(v, dict):
+            return RedisConfig(**v)
+        return v or RedisConfig()
 
 
 @lru_cache(maxsize=1)

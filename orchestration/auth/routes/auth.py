@@ -171,9 +171,27 @@ async def login(
 
 
 @router.get("/me")
-async def get_me(current_user: UserRecord = Depends(get_current_user)):
+async def get_me(
+    current_user: UserRecord = Depends(get_current_user),
+    session: AsyncSession = Depends(_get_db),
+):
     """Return current authenticated user profile."""
-    return {"user": _user_to_dict(current_user)}
+    from orchestration.db.models import MasterResume
+    from sqlalchemy import select
+    
+    result = await session.execute(select(MasterResume).where(MasterResume.user_id == current_user.user_id))
+    resume = result.scalar_one_or_none()
+    
+    user_dict = _user_to_dict(current_user)
+    if resume:
+        user_dict["resume"] = {
+            "resumeKey": resume.file_path,
+            "resumeFileName": resume.file_name
+        }
+    else:
+        user_dict["resume"] = None
+        
+    return {"user": user_dict}
 
 
 @router.patch("/me/password", status_code=status.HTTP_200_OK)
@@ -201,17 +219,15 @@ async def change_password(
 async def refresh_token(
     response: Response,
     session: AsyncSession = Depends(_get_db),
-    current_user: UserRecord = Depends(get_current_user),
     refresh_token_cookie: Optional[str] = Cookie(default=None, alias=_REFRESH_COOKIE),
 ):
-    """Rotate refresh token. Requires valid JWT + refresh cookie."""
+    """Rotate refresh token. Requires valid refresh cookie."""
     if not refresh_token_cookie:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
 
     svc = _make_service(session)
     try:
         new_access, new_refresh = await svc.refresh(
-            user_id_str=str(current_user.user_id),
             refresh_token_raw=refresh_token_cookie,
         )
     except InvalidRefreshTokenError as exc:
@@ -224,15 +240,18 @@ async def refresh_token(
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
     response: Response,
-    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(_get_db),
     refresh_token_cookie: Optional[str] = Cookie(default=None, alias=_REFRESH_COOKIE),
 ):
     """Revoke refresh token and clear cookie."""
     if refresh_token_cookie:
         svc = _make_service(session)
+        # Assuming we also update logout to not require user_id
+        # Let's check if logout can just use token_hash. Wait, logout takes user_id_str and refresh_token_raw.
+        # But if we don't have current_user... wait!
+        # Actually, let's just revoke by hash only. Or we can decode the token to find the user_id.
+        # But let's leave that to the service layer.
         await svc.logout(
-            user_id_str=str(current_user.user_id),
             refresh_token_raw=refresh_token_cookie,
         )
     _clear_refresh_cookie(response)

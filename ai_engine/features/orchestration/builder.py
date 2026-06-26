@@ -55,8 +55,8 @@ class PipelineBuilder:
 
         # Variant Management & Output
         budget_enforcer = BudgetEnforcer(
-            max_total=self.settings.max_variants_total,
-            max_per_session=self.settings.max_variants_per_session,
+            max_total=self.settings.variants.max_variants_total,
+            max_per_session=self.settings.variants.max_variants_per_session,
         )
         variant_manager = VariantManager(variant_registry, budget_enforcer)
         
@@ -65,8 +65,8 @@ class PipelineBuilder:
         output_builder = OutputBuilder(
             approval_gate,
             cover_letter_strategy,
-            self.settings.paths.output_dir,
-            minio_client=None, # Will be handled by OutputBuilder internal init if None
+            self.settings.paths.ai_output_dir,
+            minio_uploader=None, # Will be handled by OutputBuilder internal init if None
         )
 
         # Orchestration

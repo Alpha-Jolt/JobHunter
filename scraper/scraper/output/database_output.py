@@ -75,7 +75,7 @@ class DatabaseOutput(BaseOutput):
         async with self._session_factory() as session:
             stmt = pg_insert(Job).values(records)
             stmt = stmt.on_conflict_do_update(
-                constraint="jobs_source_external_id_unique",
+                index_elements=["source", "external_id"],
                 set_={
                     "title": stmt.excluded.title,
                     "company_name": stmt.excluded.company_name,

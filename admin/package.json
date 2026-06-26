@@ -1,0 +1,38 @@
+{
+  "name": "admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 5001",
+    "build": "next build",
+    "start": "next start -p 5001",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "axios": "^1.17.0",
+    "lucide-react": "^1.18.0",
+    "next": "15.5.19",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "recharts": "^2.15.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.19",
+    "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
+    "tailwindcss": "^4",
+    "ts-jest": "^29.4.11",
+    "typescript": "^5"
+  }
+}

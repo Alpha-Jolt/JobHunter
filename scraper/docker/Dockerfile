@@ -19,10 +19,9 @@ RUN playwright install chromium
 
 COPY scraper/scraper/ ./scraper/
 COPY scraper/dev_mode/ ./dev_mode/
-COPY scraper/admin_dashboard/ ./admin_dashboard/
-COPY scraper/data_collector_ui/ ./data_collector_ui/
 COPY scraper/config/ ./config/
+COPY scraper/scraper_worker/ ./scraper_worker/
 
 RUN mkdir -p logs output/raw output/processed output/final registries
 
-CMD ["python", "-m", "dev_mode.dev_runner"]
+CMD ["python", "-m", "scraper_worker.worker"]

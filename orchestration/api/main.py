@@ -54,6 +54,10 @@ async def on_startup() -> None:
         pool_size=settings.database.db_pool_size,
         max_overflow=settings.database.db_max_overflow,
     )
+    from orchestration.db.connection import _engine
+    from orchestration.db.models import Base
+    async with _engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     os.makedirs("logs", exist_ok=True)
     logger.info("JobHunter Orchestration API started")
 

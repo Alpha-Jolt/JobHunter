@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
@@ -49,6 +50,10 @@ class Job(Base):
     last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String(20), nullable=False, default="raw")
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="jobs_source_external_id_unique"),
+    )
 
 
 class ScraperRun(Base):

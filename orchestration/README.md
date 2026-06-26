@@ -179,6 +179,17 @@ Accessible at `http://localhost:8000/admin`. Auto-refreshes every 30 seconds.
 
 ---
 
+## Docker
+
+The `Dockerfile` installs `git` and `curl` in the base image. `curl` is required for the Docker healthcheck (`GET /health`).
+
+```bash
+docker compose up -d --build jobhunter-api
+# Runs on port 8000 | healthcheck: curl http://localhost:8000/health
+```
+
+---
+
 ## Running Tests
 
 ```bash
