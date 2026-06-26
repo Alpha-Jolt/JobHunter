@@ -146,7 +146,6 @@ class AuthService:
 
     async def refresh(
         self,
-        user_id_str: str,
         refresh_token_raw: str,
     ) -> tuple[str, str]:
         """Rotate refresh token and return (new_access_token, new_refresh_token).
@@ -154,16 +153,12 @@ class AuthService:
         Raises:
             InvalidRefreshTokenError: Token not found, expired, or revoked.
         """
-        try:
-            user_id = uuid.UUID(user_id_str)
-        except ValueError:
-            raise InvalidRefreshTokenError("Invalid user_id in refresh")
-
         old_hash = hash_token(refresh_token_raw)
-        token_rec = await self._repo.get_active_refresh_token(user_id, old_hash)
+        token_rec = await self._repo.get_active_refresh_token_by_hash(old_hash)
         if not token_rec:
             raise InvalidRefreshTokenError("Refresh token is invalid, expired, or revoked")
 
+        user_id = token_rec.user_id
         user = await self._repo.get_user_by_id(user_id)
         if not user or not user.is_active:
             raise InvalidRefreshTokenError("User not found or inactive")
@@ -178,19 +173,16 @@ class AuthService:
         new_access = self._make_access_token(user)
         return new_access, new_refresh_raw
 
-    async def logout(self, user_id_str: str, refresh_token_raw: str) -> None:
+    async def logout(self, refresh_token_raw: str) -> None:
         """Revoke the given refresh token.
 
         Args:
-            user_id_str: UUID string of the authenticated user.
             refresh_token_raw: Raw (unhashed) refresh token from cookie.
         """
-        try:
-            user_id = uuid.UUID(user_id_str)
-        except ValueError:
-            return  # silently ignore malformed input on logout
         token_hash = hash_token(refresh_token_raw)
-        await self._repo.revoke_refresh_token(user_id, token_hash)
+        token_rec = await self._repo.get_active_refresh_token_by_hash(token_hash)
+        if token_rec:
+            await self._repo.revoke_refresh_token(token_rec.user_id, token_hash)
 
     async def change_password(
         self,

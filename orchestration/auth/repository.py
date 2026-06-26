@@ -188,6 +188,22 @@ class AuthRepository:
         row = result.scalar_one_or_none()
         return _row_to_token(row) if row else None
 
+    async def get_active_refresh_token_by_hash(
+        self,
+        token_hash: str,
+    ) -> Optional[RefreshTokenRecord]:
+        """Return a non-revoked, non-expired refresh token by hash only."""
+        now = datetime.now(timezone.utc)
+        result = await self._session.execute(
+            select(_m.RefreshToken).where(
+                _m.RefreshToken.token_hash == token_hash,
+                _m.RefreshToken.revoked.is_(False),
+                _m.RefreshToken.expires_at > now,
+            )
+        )
+        row = result.scalar_one_or_none()
+        return _row_to_token(row) if row else None
+
     async def revoke_refresh_token(self, user_id: uuid.UUID, token_hash: str) -> None:
         """Mark a specific refresh token as revoked."""
         await self._session.execute(

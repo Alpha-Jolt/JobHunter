@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, File, CheckCircle2 } from "lucide-react";
+import { Upload, File, CheckCircle2, Eye } from "lucide-react";
 import { resumeApi } from "@/shared/api/gateway";
 import { useAuthStore } from "@/shared/state/authStore";
 import { useUserProfileStore } from "@/shared/state/userProfileStore";
@@ -63,6 +63,8 @@ export function ResumeUpload() {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
   const handleFile = async (file: File) => {
     const error = await validateFileSecurity(file);
     if (error) {
@@ -83,6 +85,18 @@ export function ResumeUpload() {
     }
   };
 
+  const handlePreview = async () => {
+    setIsPreviewLoading(true);
+    try {
+      const data = await resumeApi.preview();
+      window.open(data.url, "_blank");
+    } catch (err) {
+      addToast("error", "Failed to load preview.");
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -98,6 +112,10 @@ export function ResumeUpload() {
           <p className="text-sm font-medium text-foreground truncate">{resumeFileName}</p>
           <p className="text-xs text-muted-foreground">Resume uploaded</p>
         </div>
+        <Button variant="outline" size="sm" onClick={handlePreview} isLoading={isPreviewLoading}>
+          <Eye className="h-3.5 w-3.5 mr-1" />
+          Preview
+        </Button>
         <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
           Replace
         </Button>

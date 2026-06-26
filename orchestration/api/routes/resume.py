@@ -12,11 +12,16 @@ from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+import redis.asyncio as redis
+import uuid
+from datetime import datetime, timezone
 
 from orchestration.api.config import get_settings
 from orchestration.api.dependencies import get_db_session
 from orchestration.auth.dependencies import get_current_user, require_role
 from orchestration.auth.models.user import RoleEnum, UserRecord
+from orchestration.db.models import MasterResume
 
 router = APIRouter()
 
@@ -128,6 +133,23 @@ async def upload_resume(
     if user_id != str(current_user.user_id):
         raise HTTPException(status_code=403, detail="Cannot upload resume for another user.")
 
+    settings = get_settings()
+
+    # Rate limiting with Redis
+    try:
+        redis_client = redis.Redis.from_url(settings.redis.redis_url, decode_responses=True)
+        rate_key = f"rate_limit:resume_upload:{user_id}"
+        uploads = await redis_client.incr(rate_key)
+        if uploads == 1:
+            await redis_client.expire(rate_key, 3600)  # 1 hour
+        elif uploads > 5:
+            raise HTTPException(status_code=429, detail="Too many uploads. Please try again later.")
+    except redis.RedisError:
+        # If Redis fails, log it or fallback (we'll let it pass for now)
+        pass
+    finally:
+        await redis_client.aclose()
+
     # 2. Extension check
     original_name = file.filename or "resume"
     sanitized_name = _sanitize_filename(original_name)
@@ -164,7 +186,6 @@ async def upload_resume(
         raise HTTPException(status_code=400, detail=threat)
 
     # 7. Upload to MinIO
-    settings = get_settings()
     s3_key = f"resumes/{user_id}/{sanitized_name}"
     scheme = "https" if settings.minio.minio_secure else "http"
     s3_client = boto3.client(
@@ -208,4 +229,71 @@ async def upload_resume(
     except ClientError as exc:
         raise HTTPException(status_code=500, detail=f"Storage upload failed: {exc}") from exc
 
+    # 8. Database persistence
+    try:
+        user_uuid = uuid.UUID(user_id)
+        result = await _session.execute(select(MasterResume).where(MasterResume.user_id == user_uuid))
+        existing_resume = result.scalar_one_or_none()
+
+        now = datetime.now(timezone.utc)
+        if existing_resume:
+            existing_resume.file_name = sanitized_name
+            existing_resume.file_path = s3_key
+            existing_resume.updated_at = now
+        else:
+            new_resume = MasterResume(
+                user_id=user_uuid,
+                file_name=sanitized_name,
+                file_path=s3_key,
+                parsed_json={},
+                created_at=now,
+                updated_at=now
+            )
+            _session.add(new_resume)
+        await _session.commit()
+    except Exception as e:
+        await _session.rollback()
+        raise HTTPException(status_code=500, detail=f"Database update failed: {e}")
+
     return ResumeUploadResponse(s3_key=s3_key, file_name=sanitized_name)
+
+
+class PreviewResumeResponse(BaseModel):
+    url: str
+
+@router.get(
+    "/preview",
+    response_model=PreviewResumeResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def preview_resume(
+    current_user: UserRecord = Depends(get_current_user),
+    _session: AsyncSession = Depends(get_db_session)
+) -> PreviewResumeResponse:
+    """Generate a pre-signed MinIO URL to preview the uploaded resume."""
+    result = await _session.execute(select(MasterResume).where(MasterResume.user_id == current_user.user_id))
+    resume = result.scalar_one_or_none()
+    
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume uploaded")
+
+    settings = get_settings()
+    scheme = "https" if settings.minio.minio_secure else "http"
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+        aws_access_key_id=settings.minio.minio_access_key,
+        aws_secret_access_key=settings.minio.minio_secret_key,
+        region_name="us-east-1",
+    )
+    
+    try:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': settings.minio.minio_bucket, 'Key': resume.file_path},
+            ExpiresIn=3600
+        )
+        return PreviewResumeResponse(url=url)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate preview url: {e}")

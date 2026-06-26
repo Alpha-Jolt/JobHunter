@@ -14,6 +14,7 @@ import type {
   SendApplicationResponse,
   SentTodayResponse,
   DashboardMetrics,
+  PreviewResumeResponse,
 } from "./types";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -61,6 +62,9 @@ export const resumeApi = {
       })
       .then((r) => r.data);
   },
+
+  preview: () =>
+    client.get<PreviewResumeResponse>("/api/resume/preview").then((r) => r.data),
 };
 
 // ── Variants ──────────────────────────────────────────────────────────────────
