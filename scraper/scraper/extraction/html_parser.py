@@ -19,6 +19,7 @@ class HTMLExtractor:
         attr: Optional[str] = None,
     ) -> Optional[str]:
         """Return text (or attribute value) of the first matching element."""
+        soup = None
         try:
             soup = BeautifulSoup(html, "lxml")
             el = soup.select_one(selector)
@@ -31,10 +32,14 @@ class HTMLExtractor:
                 extra_data={"selector": selector, "error": str(exc)},
             )
             return None
+        finally:
+            if soup:
+                soup.decompose()
 
     @staticmethod
     def extract_all_by_selector(html: str, selector: str) -> List[str]:
         """Return text of all matching elements."""
+        soup = None
         try:
             soup = BeautifulSoup(html, "lxml")
             return [
@@ -46,6 +51,9 @@ class HTMLExtractor:
                 extra_data={"selector": selector, "error": str(exc)},
             )
             return []
+        finally:
+            if soup:
+                soup.decompose()
 
     @staticmethod
     def extract_by_xpath(html: str, xpath: str) -> Optional[str]:
@@ -72,6 +80,7 @@ class HTMLExtractor:
     @staticmethod
     def extract_table_data(html: str, table_selector: str) -> List[Dict[str, str]]:
         """Extract rows from an HTML table as list of dicts."""
+        soup = None
         try:
             soup = BeautifulSoup(html, "lxml")
             table = soup.select_one(table_selector)
@@ -90,3 +99,6 @@ class HTMLExtractor:
                 extra_data={"error": str(exc)},
             )
             return []
+        finally:
+            if soup:
+                soup.decompose()

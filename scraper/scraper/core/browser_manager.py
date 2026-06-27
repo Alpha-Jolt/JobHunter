@@ -106,14 +106,19 @@ class BrowserManager:
             user_agent=user_agent,
             extra_http_headers=_STEALTH_HEADERS,
         )
-        if self.enable_stealth:
-            await _STEALTH.apply_stealth_async(context)
+        
+        try:
+            if self.enable_stealth:
+                await _STEALTH.apply_stealth_async(context)
 
-        page = await context.new_page()
-        page.set_default_timeout(self.timeout_ms)
+            page = await context.new_page()
+            page.set_default_timeout(self.timeout_ms)
 
-        self.logger.debug("Page created", extra_data={"source": source})
-        return page
+            self.logger.debug("Page created", extra_data={"source": source})
+            return page
+        except Exception:
+            await context.close()
+            raise
 
     async def screenshot_for_debug(self, page: Page, source: str, identifier: str) -> Optional[str]:
         """Save a debug screenshot if debug_screenshots is enabled."""

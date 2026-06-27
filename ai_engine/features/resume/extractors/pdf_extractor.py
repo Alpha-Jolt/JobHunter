@@ -27,11 +27,13 @@ def _extract_with_pymupdf(file_path: Path) -> str:
     """Extract text using pymupdf (fitz) as fallback."""
     import fitz  # noqa: PLC0415
 
-    doc = fitz.open(str(file_path))
     lines: list[str] = []
-    for page in doc:
-        lines.append(page.get_text())
-    doc.close()
+    doc = fitz.open(str(file_path))
+    try:
+        for page in doc:
+            lines.append(page.get_text())
+    finally:
+        doc.close()
     return "\n".join(lines)
 
 

@@ -40,7 +40,7 @@ export const authApi = {
 // ── Jobs ──────────────────────────────────────────────────────────────────────
 
 export const jobsApi = {
-  list: (params?: { source?: string; limit?: number; offset?: number }) =>
+  list: (params?: { source?: string; limit?: number; offset?: number; search?: string }) =>
     client
       .get<{ jobs: JobRecord[]; total?: number }>("/api/scraper/latest-jobs", { params })
       .then((r) => r.data),

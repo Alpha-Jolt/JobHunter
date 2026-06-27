@@ -90,7 +90,7 @@ export function ResumeUpload() {
     try {
       const data = await resumeApi.preview();
       window.open(data.url, "_blank");
-    } catch (err) {
+    } catch {
       addToast("error", "Failed to load preview.");
     } finally {
       setIsPreviewLoading(false);

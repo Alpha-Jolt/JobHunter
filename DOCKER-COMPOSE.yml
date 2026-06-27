@@ -111,6 +111,7 @@ services:
     container_name: jobhunter-api
     env_file:
       - ./orchestration/.env
+      - ./ai_engine/.env
     environment:
       MAIL_BRIDGE_URL: http://mail-bridge:3000
       MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}

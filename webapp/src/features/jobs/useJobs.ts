@@ -15,6 +15,7 @@ export function useJobs() {
     try {
       const data = await jobsApi.list({
         source: filters.source,
+        search: filters.search,
         limit: filters.limit,
         offset: filters.offset,
       });

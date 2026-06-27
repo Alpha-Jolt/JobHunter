@@ -20,6 +20,9 @@ class LLMSettings(BaseSettings):
     fallback_providers: list[ProviderType] = [
         ProviderType.OPENAI,
         ProviderType.GEMINI,
+        ProviderType.DEEPSEEK,
+        ProviderType.GROK,
+        ProviderType.OPENROUTER,
     ]
     max_retries: int = Field(default=3, ge=1, le=10)
     timeout_seconds: int = Field(default=60, ge=5, le=300)

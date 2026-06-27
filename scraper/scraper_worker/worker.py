@@ -53,6 +53,13 @@ async def main():
     init_db(config.database_url)
     logger.info("Scraper worker started, waiting for tasks...")
     
+    # Limit concurrent tasks to prevent Chromium OOM
+    sem = asyncio.Semaphore(2)
+
+    async def _sem_task(data):
+        async with sem:
+            await process_task(data, r)
+
     while True:
         try:
             # blpop blocks until an item is available
@@ -62,8 +69,8 @@ async def main():
                 task_data = json.loads(task_json)
                 logger.info(f"Received task: {task_data.get('task_id')}")
                 
-                # We do not block the worker completely, process async
-                asyncio.create_task(process_task(task_data, r))
+                # Bounded concurrent execution
+                asyncio.create_task(_sem_task(task_data))
         except asyncio.CancelledError:
             break
         except Exception as e:

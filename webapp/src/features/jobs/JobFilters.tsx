@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Button } from "@/shared/components/Button";
 import { useJobStore } from "@/shared/state/jobStore";
@@ -8,6 +9,16 @@ const SOURCES = ["", "naukri", "indeed", "linkedin"];
 
 export function JobFilters() {
   const { filters, setFilters } = useJobStore();
+  const [localSearch, setLocalSearch] = useState(filters.search);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== filters.search) {
+        setFilters({ search: localSearch });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, filters.search, setFilters]);
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -16,8 +27,8 @@ export function JobFilters() {
         <input
           type="text"
           placeholder="Search jobs…"
-          value={filters.search}
-          onChange={(e) => setFilters({ search: e.target.value })}
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
           className="h-11 w-full rounded-md border border-input-border bg-input pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>

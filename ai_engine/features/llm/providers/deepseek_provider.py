@@ -66,7 +66,7 @@ class DeepSeekProvider(LLMProvider):
                     messages=[
                         {"role": "system", "content": "Respond ONLY with valid JSON."},
                         {"role": "user", "content": prompt + schema_instruction},
-                    ],
+                    ]
                 )
                 elapsed = time.monotonic() - start
                 raw_text = response.choices[0].message.content or ""
@@ -102,5 +102,8 @@ class DeepSeekProvider(LLMProvider):
                         raise ProviderError(str(exc), provider=self.provider_name) from exc
             except SchemaValidationError:
                 raise
+            except Exception as exc:
+                if attempt == max_retries - 1:
+                    raise ProviderError(str(exc), provider=self.provider_name) from exc
 
         raise ProviderError("Max retries exceeded", provider=self.provider_name)

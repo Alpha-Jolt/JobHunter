@@ -10,6 +10,7 @@ import type { JobRecord } from "@/shared/api/types";
 interface JobCardProps {
   job: JobRecord;
   onSelect: (job: JobRecord) => void;
+  isGenerating?: boolean;
 }
 
 const trustVariant = {
@@ -18,7 +19,7 @@ const trustVariant = {
   unknown: "outline",
 } as const;
 
-export function JobCard({ job, onSelect }: JobCardProps) {
+export function JobCard({ job, onSelect, isGenerating = false }: JobCardProps) {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
@@ -57,9 +58,13 @@ export function JobCard({ job, onSelect }: JobCardProps) {
         )}
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{formatRelative(job.created_at)}</span>
-          <Button size="sm" onClick={() => onSelect(job)}>
-            <Zap className="h-3.5 w-3.5" />
-            Generate Variant
+          <Button size="sm" onClick={() => onSelect(job)} disabled={isGenerating}>
+            {isGenerating ? (
+              <span className="h-3.5 w-3.5 rounded-full border-2 border-primary-foreground border-r-transparent animate-spin" />
+            ) : (
+              <Zap className="h-3.5 w-3.5" />
+            )}
+            {isGenerating ? "Generating..." : "Generate Variant"}
           </Button>
         </div>
       </CardContent>

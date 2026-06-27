@@ -115,7 +115,7 @@ class AnthropicProvider(LLMProvider):
                             ],
                         }
                     ],
-                    betas=["prompt-caching-2024-07-31"],
+                    extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
                 )
                 elapsed = time.monotonic() - start
                 raw_text = response.content[0].text.strip()

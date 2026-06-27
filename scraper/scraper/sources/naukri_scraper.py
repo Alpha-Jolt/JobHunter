@@ -177,12 +177,12 @@ class NaukriScraper(BaseScraper):
         """Extract job detail URLs from the ItemList JSON-LD block."""
         import json  # noqa: PLC0415
 
-        blocks = re.findall(
+        for match in re.finditer(
             r'<script type="application/ld\+json">(.*?)</script>',
             html,
             re.DOTALL,
-        )
-        for block in blocks:
+        ):
+            block = match.group(1)
             try:
                 data = json.loads(block)
                 if data.get("@type") == "ItemList":
@@ -194,7 +194,20 @@ class NaukriScraper(BaseScraper):
             except json.JSONDecodeError:
                 continue
 
-        self.logger.warning("No ItemList JSON-LD found on Naukri page")
+        self.logger.warning("No ItemList JSON-LD found on Naukri page, using fallback HTML extraction")
+        
+        urls = []
+        hrefs = re.findall(r'href=["\']([^"\']+?)["\']', html)
+        for href in hrefs:
+            base_href = href.split("?")[0]
+            if "job-listings-" in base_href and _JOB_ID_RE.search(base_href):
+                url = base_href if base_href.startswith("http") else f"{BASE_URL}{base_href}"
+                if url not in urls:
+                    urls.append(url)
+                    
+        if urls:
+            return urls
+            
         return []
 
     async def _fetch_job_detail_in_context(
@@ -232,13 +245,13 @@ class NaukriScraper(BaseScraper):
         """Extract IntermediateJob from JobPosting JSON-LD on a detail page."""
         import json  # noqa: PLC0415
 
-        blocks = re.findall(
+        posting = None
+        for match in re.finditer(
             r'<script type="application/ld\+json">(.*?)</script>',
             html,
             re.DOTALL,
-        )
-        posting = None
-        for block in blocks:
+        ):
+            block = match.group(1)
             try:
                 data = json.loads(block)
                 if data.get("@type") == "JobPosting":

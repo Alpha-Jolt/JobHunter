@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from orchestration.api.config import get_settings
-from orchestration.api.dependencies import get_db_session
+from orchestration.api.dependencies import get_db_session, get_internal_s3_client, get_external_s3_client
 from orchestration.auth.dependencies import get_current_user, require_role
 from orchestration.auth.models.user import RoleEnum, UserRecord
 from orchestration.db.models import MasterResume
@@ -118,6 +118,7 @@ async def upload_resume(
     user_id: str = Form(...),
     current_user: UserRecord = Depends(get_current_user),
     _session: AsyncSession = Depends(get_db_session),
+    s3_client = Depends(get_internal_s3_client),
 ) -> ResumeUploadResponse:
     """Upload a master resume (PDF or DOCX) to MinIO.
 
@@ -187,14 +188,6 @@ async def upload_resume(
 
     # 7. Upload to MinIO
     s3_key = f"resumes/{user_id}/{sanitized_name}"
-    scheme = "https" if settings.minio.minio_secure else "http"
-    s3_client = boto3.client(
-        "s3",
-        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
-        aws_access_key_id=settings.minio.minio_access_key,
-        aws_secret_access_key=settings.minio.minio_secret_key,
-        region_name="us-east-1",
-    )
 
     try:
         content_type_upload = (
@@ -269,7 +262,8 @@ class PreviewResumeResponse(BaseModel):
 )
 async def preview_resume(
     current_user: UserRecord = Depends(get_current_user),
-    _session: AsyncSession = Depends(get_db_session)
+    _session: AsyncSession = Depends(get_db_session),
+    s3_client = Depends(get_external_s3_client),
 ) -> PreviewResumeResponse:
     """Generate a pre-signed MinIO URL to preview the uploaded resume."""
     result = await _session.execute(select(MasterResume).where(MasterResume.user_id == current_user.user_id))
@@ -279,14 +273,6 @@ async def preview_resume(
         raise HTTPException(status_code=404, detail="No resume uploaded")
 
     settings = get_settings()
-    scheme = "https" if settings.minio.minio_secure else "http"
-    s3_client = boto3.client(
-        "s3",
-        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
-        aws_access_key_id=settings.minio.minio_access_key,
-        aws_secret_access_key=settings.minio.minio_secret_key,
-        region_name="us-east-1",
-    )
     
     try:
         url = s3_client.generate_presigned_url(

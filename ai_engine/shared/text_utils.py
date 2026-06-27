@@ -19,7 +19,7 @@ def normalise_for_comparison(text: str) -> str:
         Normalised string suitable for set/token operations.
     """
     text = unicodedata.normalize("NFC", text).lower()
-    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"[^\w\s]", "", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 

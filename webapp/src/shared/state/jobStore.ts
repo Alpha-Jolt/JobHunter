@@ -37,7 +37,7 @@ export const useJobStore = create<JobState & JobActions>((set) => ({
   error: null,
 
   setJobs: (jobs, total) => set({ jobs, total }),
-  setFilters: (f) => set((s) => ({ filters: { ...s.filters, ...f, offset: 0 } })),
+  setFilters: (f) => set((s) => ({ filters: { ...s.filters, ...f, offset: f.offset !== undefined ? f.offset : 0 } })),
   setSelectedJob: (job) => set({ selectedJob: job }),
   setLoading: (v) => set({ isLoading: v }),
   setError: (msg) => set({ error: msg }),

@@ -83,21 +83,34 @@ class ScraperService:
         }
 
     async def get_latest_jobs(
-        self, source: Optional[str] = None, limit: int = 20, offset: int = 0,
-    ) -> List[JobRecord]:
-        """Return active jobs ordered by last_seen_at DESC."""
+        self, source: Optional[str] = None, limit: int = 20, offset: int = 0, search: Optional[str] = None,
+    ) -> tuple[List[JobRecord], int]:
+        """Return active jobs ordered by last_seen_at DESC, and total count."""
         Job = _db_models.Job
-        stmt = (
-            select(Job)
-            .where(Job.status != "closed")
-            .order_by(Job.last_seen_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
+        
+        # Base query for filtering
+        base_stmt = select(Job).where(Job.status != "closed")
         if source:
-            stmt = stmt.where(Job.source == source)
+            base_stmt = base_stmt.where(Job.source == source)
+        if search:
+            from sqlalchemy import or_
+            search_term = f"%{search}%"
+            base_stmt = base_stmt.where(
+                or_(
+                    Job.title.ilike(search_term),
+                    Job.company_name.ilike(search_term),
+                    Job.description.ilike(search_term)
+                )
+            )
+            
+        # Get total count
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+        total = (await self._session.execute(count_stmt)).scalar() or 0
+        
+        # Get paginated results
+        stmt = base_stmt.order_by(Job.last_seen_at.desc()).limit(limit).offset(offset)
         result = await self._session.execute(stmt)
-        return [_orm_job_to_record(row) for row in result.scalars().all()]
+        return [_orm_job_to_record(row) for row in result.scalars().all()], total
 
     async def get_job_counts(self) -> Dict:
         """Return aggregated job counts by source, status, and email_trust."""

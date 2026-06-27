@@ -122,13 +122,14 @@ async def get_scraper_status(
             dependencies=[Depends(require_role(RoleEnum.ADMIN, RoleEnum.HUNTER))])
 async def get_latest_jobs(
     source: Optional[str] = Query(default=None, description="Filter by source"),
+    search: Optional[str] = Query(default=None, description="Search by title, company, or description"),
     limit: int = Query(default=20, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db_session),
 ) -> LatestJobsResponse:
-    """Return active jobs ordered by last_seen_at DESC with optional source filter."""
+    """Return active jobs ordered by last_seen_at DESC with optional source filter and search."""
     service = ScraperService(session)
-    jobs = await service.get_latest_jobs(source=source, limit=limit, offset=offset)
+    jobs, total = await service.get_latest_jobs(source=source, limit=limit, offset=offset, search=search)
 
     job_responses = [
         JobRecordResponse(
@@ -150,7 +151,7 @@ async def get_latest_jobs(
         )
         for j in jobs
     ]
-    return LatestJobsResponse(jobs=job_responses)
+    return LatestJobsResponse(jobs=job_responses, total=total)
 
 
 @router.get("/scraper/counts", response_model=JobCountsResponse,

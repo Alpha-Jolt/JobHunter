@@ -25,11 +25,14 @@ class StorageService:
             destination_key: Relative destination path within output_dir.
 
         Returns:
-            The destination key (local path relative to output_dir).
+            The destination key (local path relative to output_dir), or empty string if no file.
         """
+        if not file_path:
+            return ""
         src = Path(file_path)
+        if not src.is_file():
+            return ""
         dest = self._output_dir / destination_key
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if src.exists():
-            shutil.copy2(src, dest)
+        shutil.copy2(src, dest)
         return destination_key
