@@ -83,6 +83,7 @@ def add_cors(app) -> None:
     )
 
 import hashlib
+import os
 from opentelemetry import trace
 
 class OTelContextMiddleware(BaseHTTPMiddleware):
@@ -98,9 +99,24 @@ class OTelContextMiddleware(BaseHTTPMiddleware):
             refresh_token = request.cookies.get("refresh_token")
             session_id = hashlib.sha256(refresh_token.encode()).hexdigest() if refresh_token else ""
 
+            # Mask client IP
+            client_ip = request.client.host if request.client else ""
+            if client_ip and "." in client_ip:
+                parts = client_ip.split(".")
+                if len(parts) == 4:
+                    client_ip = f"{parts[0]}.{parts[1]}.*.*"
+
             span.set_attribute("request.id", request_id)
             span.set_attribute("user.id", str(user_id) if user_id else "")
             span.set_attribute("session.id", session_id)
+            
+            span.set_attribute("correlation_id", request_id)
+            span.set_attribute("client_version", request.headers.get("X-Client-Version", ""))
+            span.set_attribute("deployment_environment", os.getenv("DEPLOYMENT_ENV", "development"))
+            span.set_attribute("request_origin", request.headers.get("Origin", ""))
+            span.set_attribute("user_agent", request.headers.get("User-Agent", ""))
+            span.set_attribute("client_ip", client_ip)
+            span.set_attribute("authenticated", bool(user_id))
 
         response = await call_next(request)
 

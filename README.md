@@ -131,3 +131,4 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 - [Shared Registry Service](./services/README.md)
 - [Orchestration API](./orchestration/README.md)
 - [Frontend Webapp](./webapp/README.md)
+- [Observability Stack](./observability/README.md)

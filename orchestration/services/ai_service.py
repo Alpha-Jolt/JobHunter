@@ -130,6 +130,7 @@ class AIService:
             config = config.model_copy(
                 update={"use_shared_registry": False}
             )
+            from orchestration.core.metrics import resume_generation_total, ai_request_total
             async with traced("Run AI Pipeline"):
                 pipeline_result = await self._run_pipeline_for_job(
                     config=config,
@@ -137,9 +138,17 @@ class AIService:
                     resume_path=resume_path,
                     user_id=user_id,
                 )
+            resume_generation_total.add(1)
+            ai_request_total.add(1, {"provider": "anthropic"})
         except AIServiceError:
+            from orchestration.core.metrics import resume_generation_failed_total, ai_failure_total
+            resume_generation_failed_total.add(1)
+            ai_failure_total.add(1)
             raise
         except Exception as exc:
+            from orchestration.core.metrics import resume_generation_failed_total, ai_failure_total
+            resume_generation_failed_total.add(1)
+            ai_failure_total.add(1)
             raise AIServiceError(f"Variant generation failed: {exc}") from exc
 
         optimised_variant, comparison_result = pipeline_result
@@ -211,6 +220,11 @@ class AIService:
         Returns:
             Tuple of (optimised_variant_dict, comparison_result_dict).
         """
+        import time
+        from orchestration.core.metrics import ai_request_duration, resume_processing_duration
+        
+        start_time = time.perf_counter()
+        
         if not self.ai_pipeline:
             raise AIServiceError("AI Pipeline is not initialized.")
             
@@ -231,6 +245,10 @@ class AIService:
             variant = await executor._optimiser.optimise(resume, analysis, comparison)
         except Exception as exc:
             raise AIServiceError(f"Variant generation failed: {exc}") from exc
+        finally:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            ai_request_duration.record(duration_ms)
+            resume_processing_duration.record(duration_ms)
 
         curated_json = {
             "personal": resume.personal.model_dump(),

@@ -115,6 +115,7 @@ services:
     environment:
       MAIL_BRIDGE_URL: http://mail-bridge:3000
       MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports:
       - "8000:8000"
     healthcheck:

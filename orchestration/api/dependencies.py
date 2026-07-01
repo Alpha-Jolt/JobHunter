@@ -49,18 +49,18 @@ def _get_cached_s3_client(endpoint_url: str, access_key: str, secret_key: str):
 
 
 def get_internal_s3_client(settings: Settings = Depends(get_settings)):
-    scheme = "https" if settings.minio.use_ssl else "http"
-    endpoint_url = f"{scheme}://{settings.minio.endpoint}"
-    return _get_cached_s3_client(endpoint_url, settings.minio.access_key.get_secret_value(), settings.minio.secret_key.get_secret_value())
+    scheme = "https" if settings.minio.minio_secure else "http"
+    endpoint_url = f"{scheme}://{settings.minio.minio_endpoint}"
+    return _get_cached_s3_client(endpoint_url, settings.minio.minio_access_key, settings.minio.minio_secret_key)
 
 
 def get_external_s3_client(settings: Settings = Depends(get_settings)):
-    scheme = "https" if settings.minio.use_ssl else "http"
-    endpoint = settings.minio.endpoint
+    scheme = "https" if settings.minio.minio_secure else "http"
+    endpoint = settings.minio.minio_endpoint
     if endpoint.startswith("minio:"):
         endpoint = endpoint.replace("minio:", "localhost:")
     endpoint_url = f"{scheme}://{endpoint}"
-    return _get_cached_s3_client(endpoint_url, settings.minio.access_key.get_secret_value(), settings.minio.secret_key.get_secret_value())
+    return _get_cached_s3_client(endpoint_url, settings.minio.minio_access_key, settings.minio.minio_secret_key)
 
 
 async def get_job_registry(

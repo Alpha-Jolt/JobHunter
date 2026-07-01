@@ -61,6 +61,11 @@ async def get_current_user(
 
     jwt_secret, jwt_algorithm = _get_jwt_config()
 
+    from orchestration.core.metrics import jwt_validation_duration
+    from orchestration.core.spans import traced
+    import time
+    
+    start_time = time.perf_counter()
     try:
         payload = decode_access_token(credentials.credentials, jwt_secret, jwt_algorithm)
     except TokenExpiredError:
@@ -71,6 +76,9 @@ async def get_current_user(
         )
     except TokenError:
         raise _CREDENTIALS_EXCEPTION
+    finally:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        jwt_validation_duration.record(duration_ms)
 
     import uuid
     try:
@@ -79,7 +87,8 @@ async def get_current_user(
         raise _CREDENTIALS_EXCEPTION
 
     repo = AuthRepository(session)
-    user = await repo.get_user_by_id(user_id)
+    async with traced("Session Validation"):
+        user = await repo.get_user_by_id(user_id)
 
     if not user:
         raise _CREDENTIALS_EXCEPTION

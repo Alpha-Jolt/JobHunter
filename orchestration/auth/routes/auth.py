@@ -246,15 +246,15 @@ async def logout(
     refresh_token_cookie: Optional[str] = Cookie(default=None, alias=_REFRESH_COOKIE),
 ):
     """Revoke refresh token and clear cookie."""
+    from orchestration.core.spans import traced
+    from orchestration.core.metrics import logout_total
+    
     if refresh_token_cookie:
         svc = _make_service(session)
-        # Assuming we also update logout to not require user_id
-        # Let's check if logout can just use token_hash. Wait, logout takes user_id_str and refresh_token_raw.
-        # But if we don't have current_user... wait!
-        # Actually, let's just revoke by hash only. Or we can decode the token to find the user_id.
-        # But let's leave that to the service layer.
-        await svc.logout(
-            refresh_token_raw=refresh_token_cookie,
-        )
+        async with traced("Logout"):
+            await svc.logout(
+                refresh_token_raw=refresh_token_cookie,
+            )
     _clear_refresh_cookie(response)
+    logout_total.add(1)
     return {"success": True}

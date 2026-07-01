@@ -1,0 +1,102 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus/self:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 15s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+  
+  resource:
+    attributes:
+      - key: service.namespace
+        value: "jobhunter"
+        action: insert
+      - key: deployment.environment
+        from_attribute: deployment.environment
+        action: upsert
+        
+  attributes/mask_ip:
+    actions:
+      - key: client_ip
+        action: hash
+        
+  batch:
+    send_batch_size: 512
+    timeout: 5s
+
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100000
+    expected_new_traces_per_sec: 100
+    policies:
+      [
+        {
+          name: always_sample_errors,
+          type: status_code,
+          status_code: {status_codes: [ERROR]}
+        },
+        {
+          name: always_sample_slow,
+          type: latency,
+          latency: {threshold_ms: 2000}
+        },
+        {
+          name: probabilistic_normal,
+          type: probabilistic,
+          probabilistic: {sampling_percentage: 10}
+        }
+      ]
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    default_labels_enabled:
+      exporter: true
+      job: true
+  
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    send_timestamps: true
+    metric_expiration: 120m
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: 0.0.0.0:1777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes/mask_ip, tail_sampling, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp, prometheus/self]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, attributes/mask_ip, batch]
+      exporters: [loki]

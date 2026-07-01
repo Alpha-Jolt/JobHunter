@@ -66,7 +66,10 @@ orchestration/
 │       └── health.py    # /health and /readiness endpoints
 ├── core/
 │   ├── exceptions.py    # Domain exceptions (ApprovalRequiredError, MailSendError, etc.)
-│   └── logging_setup.py # Structured JSON logging
+│   ├── logging_setup.py # Structured JSON logging with trace/span ID injection
+│   ├── telemetry.py     # OTel bootstrap — Resource, Exporter, FastAPI/SQL/HTTPX/Redis instrumentors
+│   ├── spans.py         # `traced()` async context manager for semantic business spans
+│   └── metrics.py       # Business metric instruments (login_total, ai_request_duration, etc.)
 ├── db/
 │   ├── connection.py    # Async engine, session factory
 │   ├── models.py        # SQLAlchemy ORM (6 models)
@@ -168,16 +171,79 @@ Only on all gates passing does it call Mail-Bridge and record the application.
 
 ---
 
-## Observability (OpenTelemetry)
+## Observability (OpenTelemetry + LGTM Stack)
 
-The orchestration service includes production-grade observability via OpenTelemetry.
+The service emits OTLP traces, Prometheus metrics, and enriched JSON logs. The full backend stack lives in `DOCKER-COMPOSE.observability.yml`.
 
-- **Traces**: Exported via OTLP gRPC. Custom semantic spans (`Login`, `Run AI Pipeline`, etc.) wrap critical logic.
-- **Metrics**: Exposed via the `/metrics` endpoint for Prometheus.
-- **Logs**: Structured JSON logs are automatically enriched with `trace_id` and `span_id` for Loki correlation.
-- **Cross-Service**: `traceparent` headers are extracted on incoming requests and injected into outgoing `httpx` requests (e.g., to Mail-Bridge).
+### Signal routing
 
-Configuration is managed via the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
+| Signal | Path |
+|---|---|
+| Traces | `jobhunter-api` → OTLP gRPC → `otel-collector` → Tempo |
+| Metrics | `jobhunter-api:/metrics` ← Prometheus scrape |
+| Logs | `jobhunter-api` → OTLP → `otel-collector` → Loki |
+
+### Auto-instrumentation
+
+`telemetry.py` registers: `FastAPIInstrumentor` (excluding `/metrics`, `/health`), `SQLAlchemyInstrumentor`, `HTTPXClientInstrumentor`, `RedisInstrumentor`, `BotocoreInstrumentor`.
+
+### Semantic spans
+
+Custom spans use `async with traced("Span Name")` from `core/spans.py`:
+
+| Span | Location |
+|---|---|
+| `Login` | `auth/routes/auth.py` |
+| `Password Verification` | `auth/service.py` |
+| `Validate Refresh Token` | `auth/service.py` |
+| `Refresh Token Rotation` | `auth/service.py` |
+| `Session Validation` | `auth/dependencies.py` |
+| `Logout` | `auth/routes/auth.py` |
+| `RBAC` | `auth/dependencies.py` |
+| `Download Master Resume` | `services/ai_service.py` |
+| `Run AI Pipeline` | `services/ai_service.py` |
+| `Persist Variant` | `services/ai_service.py` |
+| `MinIO Upload` | `api/routes/resume.py` |
+| `MinIO Download Presigned URL` | `api/routes/resume.py` |
+
+### Business metrics (`core/metrics.py`)
+
+| Metric | Type | Description |
+|---|---|---|
+| `login_total` | Counter | Successful logins |
+| `login_failure_total` | Counter | Failed logins with `reason` label |
+| `jwt_validation_duration` | Histogram | JWT decode latency (ms) |
+| `refresh_token_total` | Counter | Token rotations |
+| `logout_total` | Counter | Logouts |
+| `resume_upload_total` | Counter | Master resume uploads |
+| `resume_generation_total` | Counter | Variant generation calls |
+| `resume_generation_failed_total` | Counter | Generation failures |
+| `resume_processing_duration` | Histogram | Pipeline wall-time (ms) |
+| `resume_download_total` | Counter | Presigned URL generations |
+| `ai_request_total` | Counter | AI invocations with `provider` label |
+| `ai_request_duration` | Histogram | AI call duration (ms) |
+| `ai_failure_total` | Counter | AI failures |
+| `minio_upload_total` | Counter | MinIO puts with `result` label |
+| `minio_download_total` | Counter | MinIO presigned downloads |
+
+### Log enrichment (`core/logging_setup.py`)
+
+Every JSON log record includes:
+`timestamp`, `level`, `logger`, `message`, `service.name`, `environment`, `version`, `hostname`, `trace_id`, `span_id`, `business_operation` (if span active), plus optional `path`, `method`, `status_code`, `latency_ms`, `user_id`, `job_id`, `variant_id`, `req_id`, and full `stack_trace` on exceptions.
+
+### Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4317` | OTLP gRPC endpoint |
+
+### Running the observability stack
+
+```bash
+docker compose -f DOCKER-COMPOSE.observability.yml up -d
+# Grafana:    http://localhost:4000
+# Prometheus: http://localhost:9090
+```
 
 ---
 

@@ -217,9 +217,16 @@ async def upload_resume(
                 ContentType=content_type_upload,
             )
 
+        from orchestration.core.spans import traced
+        from orchestration.core.metrics import minio_upload_total
+        
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _upload_to_minio)
+        async with traced("MinIO Upload"):
+            await loop.run_in_executor(None, _upload_to_minio)
+        minio_upload_total.add(1, {"result": "success"})
     except ClientError as exc:
+        from orchestration.core.metrics import minio_upload_total
+        minio_upload_total.add(1, {"result": "failure"})
         raise HTTPException(status_code=500, detail=f"Storage upload failed: {exc}") from exc
 
     # 8. Database persistence
@@ -248,6 +255,9 @@ async def upload_resume(
         await _session.rollback()
         raise HTTPException(status_code=500, detail=f"Database update failed: {e}")
 
+    from orchestration.core.metrics import resume_upload_total
+    resume_upload_total.add(1)
+    
     return ResumeUploadResponse(s3_key=s3_key, file_name=sanitized_name)
 
 
@@ -275,11 +285,19 @@ async def preview_resume(
     settings = get_settings()
     
     try:
-        url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': settings.minio.minio_bucket, 'Key': resume.file_path},
-            ExpiresIn=3600
-        )
+        from orchestration.core.spans import traced
+        from orchestration.core.metrics import minio_download_total
+        async with traced("MinIO Download Presigned URL"):
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': settings.minio.minio_bucket, 'Key': resume.file_path},
+                ExpiresIn=3600
+            )
+        minio_download_total.add(1)
+        
+        from orchestration.core.metrics import resume_download_total
+        resume_download_total.add(1)
+        
         return PreviewResumeResponse(url=url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate preview url: {e}")

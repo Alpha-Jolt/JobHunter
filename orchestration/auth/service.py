@@ -126,10 +126,20 @@ class AuthService:
             InvalidCredentialsError: Wrong email or password.
             InactiveUserError: Account deactivated.
         """
+        from orchestration.core.metrics import login_total, login_failure_total
+        from orchestration.core.spans import traced
+        
         user = await self._repo.get_user_by_email(email)
-        if not user or not verify_password(password, user.password_hash):
+        
+        async with traced("Password Verification"):
+            is_valid_pw = user and verify_password(password, user.password_hash)
+            
+        if not is_valid_pw:
+            login_failure_total.add(1, {"reason": "invalid_creds"})
             raise InvalidCredentialsError("Invalid email or password")
+            
         if not user.is_active:
+            login_failure_total.add(1, {"reason": "inactive"})
             raise InactiveUserError("Account has been deactivated")
 
         # Rehash if argon2 params changed
@@ -145,6 +155,7 @@ class AuthService:
         expires_at = datetime.now(timezone.utc) + self._refresh_expiry
         await self._repo.save_refresh_token(user.user_id, refresh_hash, expires_at)
 
+        login_total.add(1, {"result": "success"})
         return access_token, refresh_raw, user
 
     async def refresh(
@@ -169,13 +180,17 @@ class AuthService:
                 raise InvalidRefreshTokenError("User not found or inactive")
 
         # Atomic rotation: revoke old, issue new
-        await self._repo.revoke_refresh_token(user_id, old_hash)
-        new_refresh_raw = generate_refresh_token()
-        new_refresh_hash = hash_token(new_refresh_raw)
-        expires_at = datetime.now(timezone.utc) + self._refresh_expiry
-        await self._repo.save_refresh_token(user_id, new_refresh_hash, expires_at)
-
-        new_access = self._make_access_token(user)
+        from orchestration.core.metrics import refresh_token_total
+        async with traced("Refresh Token Rotation"):
+            await self._repo.revoke_refresh_token(user_id, old_hash)
+            new_refresh_raw = generate_refresh_token()
+            new_refresh_hash = hash_token(new_refresh_raw)
+            expires_at = datetime.now(timezone.utc) + self._refresh_expiry
+            await self._repo.save_refresh_token(user_id, new_refresh_hash, expires_at)
+    
+            new_access = self._make_access_token(user)
+            
+        refresh_token_total.add(1)
         return new_access, new_refresh_raw
 
     async def logout(self, refresh_token_raw: str) -> None:

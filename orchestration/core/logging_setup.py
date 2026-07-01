@@ -50,12 +50,19 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         from opentelemetry import trace
+        import os
+        import socket
+        import traceback
         
         log_dict = {
             'timestamp': datetime.utcnow().isoformat(),
             'level': record.levelname,
             'logger': record.name,
             'message': record.getMessage(),
+            'service.name': "jobhunter-orchestration",
+            'environment': os.getenv("DEPLOYMENT_ENV", "development"),
+            'version': os.getenv("APP_VERSION", "1.0.0"),
+            'hostname': socket.gethostname(),
         }
 
         # Inject OTel context for Loki correlation
@@ -64,17 +71,33 @@ class JSONFormatter(logging.Formatter):
             ctx = span.get_span_context()
             log_dict['trace_id'] = format(ctx.trace_id, "032x")
             log_dict['span_id'] = format(ctx.span_id, "016x")
+            log_dict['business_operation'] = span.name
 
-        # Add extra fields
+        # Add HTTP specific fields if passed as extra
+        if hasattr(record, 'path'):
+            log_dict['path'] = record.path
+        if hasattr(record, 'method'):
+            log_dict['method'] = record.method
+        if hasattr(record, 'status_code'):
+            log_dict['status_code'] = record.status_code
+        if hasattr(record, 'latency_ms'):
+            log_dict['latency_ms'] = record.latency_ms
+
+        # Add extra business fields
         if hasattr(record, 'user_id'):
             log_dict['user_id'] = record.user_id
         if hasattr(record, 'job_id'):
             log_dict['job_id'] = record.job_id
         if hasattr(record, 'variant_id'):
             log_dict['variant_id'] = record.variant_id
+            
+        if hasattr(record, 'req_id'):
+            log_dict['req_id'] = record.req_id
 
         # Add exception if present
         if record.exc_info:
+            log_dict['exception_type'] = record.exc_info[0].__name__ if record.exc_info[0] else None
+            log_dict['stack_trace'] = traceback.format_exception(*record.exc_info)
             log_dict['exception'] = self.formatException(record.exc_info)
 
         return json.dumps(log_dict, default=str)

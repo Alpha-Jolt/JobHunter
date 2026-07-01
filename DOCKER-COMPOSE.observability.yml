@@ -1,0 +1,81 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: jobhunter-otel-collector
+    command: [ "--config=/etc/otel-collector-config.yml" ]
+    volumes:
+      - ./observability/otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "13133:13133" # health_check
+      - "55679:55679" # zpages
+      - "1777:1777"   # pprof
+    networks:
+      - default
+    depends_on:
+      - tempo
+      - loki
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: jobhunter-tempo
+    command: [ "-config.file=/etc/tempo.yml" ]
+    volumes:
+      - ./observability/tempo-config.yml:/etc/tempo.yml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP
+    networks:
+      - default
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: jobhunter-loki
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    volumes:
+      - ./observability/loki-config.yml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    ports:
+      - "3100:3100" # Loki HTTP
+    networks:
+      - default
+
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    container_name: jobhunter-prometheus
+    command: [ "--config.file=/etc/prometheus/prometheus.yml", "--enable-feature=exemplar-storage" ]
+    volumes:
+      - ./observability/prometheus-config.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090" # Prometheus HTTP
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: jobhunter-grafana
+    env_file:
+      - ./observability/.env
+    environment:
+      - GF_FEATURE_TOGGLES_ENABLE=traceToLogs
+    volumes:
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "4000:3000" # Grafana HTTP
+    networks:
+      - default
+
+volumes:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: jobhunter_jobhunter_network
+    external: true
