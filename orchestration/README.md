@@ -168,6 +168,19 @@ Only on all gates passing does it call Mail-Bridge and record the application.
 
 ---
 
+## Observability (OpenTelemetry)
+
+The orchestration service includes production-grade observability via OpenTelemetry.
+
+- **Traces**: Exported via OTLP gRPC. Custom semantic spans (`Login`, `Run AI Pipeline`, etc.) wrap critical logic.
+- **Metrics**: Exposed via the `/metrics` endpoint for Prometheus.
+- **Logs**: Structured JSON logs are automatically enriched with `trace_id` and `span_id` for Loki correlation.
+- **Cross-Service**: `traceparent` headers are extracted on incoming requests and injected into outgoing `httpx` requests (e.g., to Mail-Bridge).
+
+Configuration is managed via the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable.
+
+---
+
 ## Admin Dashboard
 
 Accessible at `http://localhost:8000/admin`. Auto-refreshes every 30 seconds.

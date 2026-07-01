@@ -120,6 +120,7 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 | Admin Dashboard | ✅ Complete |
 | Auth & RBAC | ✅ Complete |
 | Frontend Webapp | ✅ Complete |
+| Observability (OTel) | ✅ Complete |
 
 ---
 

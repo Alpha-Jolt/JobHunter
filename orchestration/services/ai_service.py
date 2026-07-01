@@ -80,13 +80,15 @@ class AIService:
             raise ValueError("job_record must have a non-empty description")
 
         # 2. Parse resume and store in master_resumes
+        from orchestration.core.spans import traced
         try:
-            master_resume_id, parsed_json, prompt_version = (
-                await self.master_resume_registry.get_or_create(
-                    user_id=user_id,
-                    file_path=master_resume_path,
+            async with traced("Download Master Resume"):
+                master_resume_id, parsed_json, prompt_version = (
+                    await self.master_resume_registry.get_or_create(
+                        user_id=user_id,
+                        file_path=master_resume_path,
+                    )
                 )
-            )
         except Exception as exc:
             raise AIServiceError(f"Resume parsing failed: {exc}") from exc
 
@@ -111,6 +113,7 @@ class AIService:
             raise AIServiceError(f"Job record conversion failed: {exc}") from exc
 
         # 4. Run AI pipeline (generate mode for single job)
+        from orchestration.core.spans import traced
         try:
             from ai_engine.features.orchestration.models.pipeline_config import PipelineConfig
             from ai_engine.core.types import PipelineMode
@@ -127,12 +130,13 @@ class AIService:
             config = config.model_copy(
                 update={"use_shared_registry": False}
             )
-            pipeline_result = await self._run_pipeline_for_job(
-                config=config,
-                ai_job=ai_job,
-                resume_path=resume_path,
-                user_id=user_id,
-            )
+            async with traced("Run AI Pipeline"):
+                pipeline_result = await self._run_pipeline_for_job(
+                    config=config,
+                    ai_job=ai_job,
+                    resume_path=resume_path,
+                    user_id=user_id,
+                )
         except AIServiceError:
             raise
         except Exception as exc:
@@ -140,49 +144,50 @@ class AIService:
 
         optimised_variant, comparison_result = pipeline_result
 
-        # 5. Upload output files to storage
-        variant_id = uuid.uuid4()
-        base_key = f"{user_id}/{job_uuid}"
-        try:
-            pdf_key = await self.storage_service.upload_file(
-                optimised_variant.get("pdf_path", ""),
-                f"{base_key}/resume.pdf",
-            )
-            docx_key = await self.storage_service.upload_file(
-                optimised_variant.get("docx_path", ""),
-                f"{base_key}/resume.docx",
-            )
-            cover_letter_key = await self.storage_service.upload_file(
-                optimised_variant.get("cover_letter_path", ""),
-                f"{base_key}/cover_letter.pdf",
-            )
-        except Exception as exc:
-            raise AIServiceError(f"File storage failed: {exc}") from exc
+        async with traced("Persist Variant"):
+            # 5. Upload output files to storage
+            variant_id = uuid.uuid4()
+            base_key = f"{user_id}/{job_uuid}"
+            try:
+                pdf_key = await self.storage_service.upload_file(
+                    optimised_variant.get("pdf_path", ""),
+                    f"{base_key}/resume.pdf",
+                )
+                docx_key = await self.storage_service.upload_file(
+                    optimised_variant.get("docx_path", ""),
+                    f"{base_key}/resume.docx",
+                )
+                cover_letter_key = await self.storage_service.upload_file(
+                    optimised_variant.get("cover_letter_path", ""),
+                    f"{base_key}/cover_letter.pdf",
+                )
+            except Exception as exc:
+                raise AIServiceError(f"File storage failed: {exc}") from exc
 
-        # 6. Build and store VariantRecord
-        curated_json = optimised_variant.get("curated_json", {})
-        gaps = optimised_variant.get("gaps", [])
-        match_score = comparison_result.get("match_score", 0)
+            # 6. Build and store VariantRecord
+            curated_json = optimised_variant.get("curated_json", {})
+            gaps = optimised_variant.get("gaps", [])
+            match_score = comparison_result.get("match_score", 0)
 
-        variant_record = VariantRecord(
-            variant_id=variant_id,
-            user_id=user_id,
-            job_id=job_uuid,
-            master_resume_id=master_resume_id,
-            pdf_key=pdf_key,
-            docx_key=docx_key,
-            cover_letter_key=cover_letter_key,
-            curated_json={**curated_json, "match_score": match_score},
-            gaps_identified=gaps,
-            approval_status="pending",
-            prompt_version=optimised_variant.get("prompt_version", ""),
-            created_at=datetime.now(timezone.utc),
-        )
+            variant_record = VariantRecord(
+                variant_id=variant_id,
+                user_id=user_id,
+                job_id=job_uuid,
+                master_resume_id=master_resume_id,
+                pdf_key=pdf_key,
+                docx_key=docx_key,
+                cover_letter_key=cover_letter_key,
+                curated_json={**curated_json, "match_score": match_score},
+                gaps_identified=gaps,
+                approval_status="pending",
+                prompt_version=optimised_variant.get("prompt_version", ""),
+                created_at=datetime.now(timezone.utc),
+            )
 
-        try:
-            await self.variant_registry.save(variant_record)
-        except RegistryError as exc:
-            raise AIServiceError(str(exc)) from exc
+            try:
+                await self.variant_registry.save(variant_record)
+            except RegistryError as exc:
+                raise AIServiceError(str(exc)) from exc
 
         # 7. Generate approval token
         user_email = getattr(job_record, "apply_email", "") or ""

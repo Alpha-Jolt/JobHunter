@@ -156,11 +156,13 @@ async def login(
 ):
     """Authenticate and receive JWT + refresh token cookie."""
     svc = _make_service(session)
+    from orchestration.core.spans import traced
     try:
-        access_token, refresh_raw, user = await svc.login(
-            email=str(body.email),
-            password=body.password,
-        )
+        async with traced("Login", user_email=str(body.email)):
+            access_token, refresh_raw, user = await svc.login(
+                email=str(body.email),
+                password=body.password,
+            )
     except InactiveUserError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account is inactive")
     except InvalidCredentialsError:

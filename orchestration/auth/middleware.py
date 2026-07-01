@@ -19,12 +19,15 @@ class JWTLoggingMiddleware(BaseHTTPMiddleware):
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
-            try:
-                from orchestration.api.config import get_settings
-                from orchestration.auth.tokens import decode_access_token
-                s = get_settings()
-                payload = decode_access_token(token, s.auth.jwt_secret, s.auth.jwt_algorithm)
-                request.state.user_id = payload.sub
-            except Exception:
-                pass  # invalid/expired token — let dependency layer handle it
+            from opentelemetry import trace
+            tracer = trace.get_tracer("jobhunter.orchestration")
+            with tracer.start_as_current_span("JWT Verification"):
+                try:
+                    from orchestration.api.config import get_settings
+                    from orchestration.auth.tokens import decode_access_token
+                    s = get_settings()
+                    payload = decode_access_token(token, s.auth.jwt_secret, s.auth.jwt_algorithm)
+                    request.state.user_id = payload.sub
+                except Exception:
+                    pass  # invalid/expired token — let dependency layer handle it
         return await call_next(request)

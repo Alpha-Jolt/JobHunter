@@ -68,14 +68,17 @@ class AuthService:
             raise ValueError(f"Invalid email format: {email}")
 
     def _make_access_token(self, user: UserRecord) -> str:
-        expiry = datetime.now(timezone.utc) + self._access_expiry
-        return encode_access_token(
-            user_id=str(user.user_id),
-            role=user.role,
-            secret=self._secret,
-            algorithm=self._algorithm,
-            expiry=expiry,
-        )
+        from opentelemetry import trace
+        tracer = trace.get_tracer("jobhunter.orchestration")
+        with tracer.start_as_current_span("Generate Access Token"):
+            expiry = datetime.now(timezone.utc) + self._access_expiry
+            return encode_access_token(
+                user_id=str(user.user_id),
+                role=user.role,
+                secret=self._secret,
+                algorithm=self._algorithm,
+                expiry=expiry,
+            )
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -153,15 +156,17 @@ class AuthService:
         Raises:
             InvalidRefreshTokenError: Token not found, expired, or revoked.
         """
-        old_hash = hash_token(refresh_token_raw)
-        token_rec = await self._repo.get_active_refresh_token_by_hash(old_hash)
-        if not token_rec:
-            raise InvalidRefreshTokenError("Refresh token is invalid, expired, or revoked")
+        from orchestration.core.spans import traced
+        async with traced("Validate Refresh Token"):
+            old_hash = hash_token(refresh_token_raw)
+            token_rec = await self._repo.get_active_refresh_token_by_hash(old_hash)
+            if not token_rec:
+                raise InvalidRefreshTokenError("Refresh token is invalid, expired, or revoked")
 
-        user_id = token_rec.user_id
-        user = await self._repo.get_user_by_id(user_id)
-        if not user or not user.is_active:
-            raise InvalidRefreshTokenError("User not found or inactive")
+            user_id = token_rec.user_id
+            user = await self._repo.get_user_by_id(user_id)
+            if not user or not user.is_active:
+                raise InvalidRefreshTokenError("User not found or inactive")
 
         # Atomic rotation: revoke old, issue new
         await self._repo.revoke_refresh_token(user_id, old_hash)

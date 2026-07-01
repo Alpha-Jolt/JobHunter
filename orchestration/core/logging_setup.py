@@ -49,12 +49,21 @@ class JSONFormatter(logging.Formatter):
     """Format logs as JSON for structured logging."""
 
     def format(self, record: logging.LogRecord) -> str:
+        from opentelemetry import trace
+        
         log_dict = {
             'timestamp': datetime.utcnow().isoformat(),
             'level': record.levelname,
             'logger': record.name,
             'message': record.getMessage(),
         }
+
+        # Inject OTel context for Loki correlation
+        span = trace.get_current_span()
+        if span.is_recording():
+            ctx = span.get_span_context()
+            log_dict['trace_id'] = format(ctx.trace_id, "032x")
+            log_dict['span_id'] = format(ctx.span_id, "016x")
 
         # Add extra fields
         if hasattr(record, 'user_id'):

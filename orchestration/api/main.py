@@ -8,11 +8,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from orchestration.api.config import get_settings
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Response
+
 from orchestration.api.middleware import (
     ErrorHandlingMiddleware,
     RequestIDMiddleware,
     RequestLoggingMiddleware,
     add_cors,
+    OTelContextMiddleware,
 )
 from orchestration.api.routes import scraper as scraper_router
 from orchestration.api.routes.ai import router as ai_router
@@ -24,6 +28,7 @@ from orchestration.api.routes.resume import router as resume_router
 from orchestration.auth.middleware import JWTLoggingMiddleware
 from orchestration.core.logging_setup import setup_logging
 from orchestration.db.connection import dispose_engine, init_engine
+from orchestration.core.telemetry import setup_telemetry, instrument_sqlalchemy
 
 settings = get_settings()
 setup_logging(log_level=settings.api.log_level, log_format="json")
@@ -38,12 +43,20 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ── Metrics ──────────────────────────────────────────────────────────────────
+@app.get("/metrics", tags=["system"])
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 # ── Middleware ───────────────────────────────────────────────────────────────
-add_cors(app)
-app.add_middleware(ErrorHandlingMiddleware)
-app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(RequestIDMiddleware)
+app.add_middleware(OTelContextMiddleware)
 app.add_middleware(JWTLoggingMiddleware)
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
+add_cors(app)
+
+setup_telemetry(app)
 
 
 # ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -56,6 +69,7 @@ async def on_startup() -> None:
     )
     from orchestration.db.connection import _engine
     from orchestration.db.models import Base
+    instrument_sqlalchemy(_engine)
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     os.makedirs("logs", exist_ok=True)

@@ -81,3 +81,30 @@ def add_cors(app) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+import hashlib
+from opentelemetry import trace
+
+class OTelContextMiddleware(BaseHTTPMiddleware):
+    """Enrich the active OTEL span with request context fields."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        span = trace.get_current_span()
+        if span.is_recording():
+            request_id = getattr(request.state, "request_id", "")
+            user_id = getattr(request.state, "user_id", "")
+            
+            # Secure session ID hash
+            refresh_token = request.cookies.get("refresh_token")
+            session_id = hashlib.sha256(refresh_token.encode()).hexdigest() if refresh_token else ""
+
+            span.set_attribute("request.id", request_id)
+            span.set_attribute("user.id", str(user_id) if user_id else "")
+            span.set_attribute("session.id", session_id)
+
+        response = await call_next(request)
+
+        ctx = span.get_span_context()
+        if ctx and ctx.is_valid:
+            response.headers["X-Trace-ID"] = format(ctx.trace_id, "032x")
+        return response

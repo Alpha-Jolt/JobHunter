@@ -101,6 +101,11 @@ class RedisConfig(BaseSettings):
     
     redis_url: str = Field(default="redis://jobhunter-redis-1:6379/0", alias="REDIS_URL")
 
+class OtelConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    otel_exporter_otlp_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
+    otel_service_name: str = Field(default="jobhunter-orchestration", alias="OTEL_SERVICE_NAME")
+
 class Settings(BaseSettings):
     """Aggregated application settings."""
 
@@ -114,6 +119,7 @@ class Settings(BaseSettings):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     minio: MinIOConfig = Field(default_factory=MinIOConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
+    otel: OtelConfig = Field(default_factory=OtelConfig)
 
     @field_validator("database", mode="before")
     @classmethod
