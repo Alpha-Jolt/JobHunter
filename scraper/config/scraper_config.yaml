@@ -30,3 +30,27 @@ pipeline:
 output:
   formats: []
   directory: "output"
+
+company_discovery:
+  bootstrap_sources:
+    enabled: true
+    monthly_refresh: true
+  discovery_mode:
+    max_queries_per_session: 15
+    pause_between_sessions_minutes: 5
+    search_engine_primary: "duckduckgo"
+    search_engine_fallback: "bing"
+  enrichment:
+    robots_check_timeout_seconds: 5
+    page_request_timeout_seconds: 30
+    rate_limit_rps: 0.33
+  email_refresh:
+    refresh_interval_days: 30
+
+career_page:
+  enabled: true
+  rate_limit_rps: 1.0
+  sitemap_rate_limit_rps: 0.33
+  playwright_timeout_ms: 30000
+  weekly_refresh_day: "monday"
+  weekly_refresh_hour: 4

@@ -20,4 +20,6 @@ flake8==7.0.0
 email-validator==2.1.1
 sqlalchemy[asyncio]==2.0.30
 asyncpg==0.29.0
-jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.2.1
+tldextract==5.1.1
+respx==0.21.1
+jobhunter-dpl @ git+https://github.com/Alpha-Jolt/JobHunter-DPL.git@v0.3.1

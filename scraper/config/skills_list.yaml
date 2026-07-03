@@ -1,0 +1,211 @@
+# Curated skill keyword list for SkillExtractor
+# Used by the career page job cleaner to tag skills from job descriptions.
+# All entries are lowercase. Matching is case-insensitive substring or word match.
+
+programming_languages:
+  - python
+  - java
+  - javascript
+  - typescript
+  - golang
+  - go
+  - rust
+  - ruby
+  - php
+  - swift
+  - kotlin
+  - scala
+  - c++
+  - c#
+  - c
+  - r
+  - matlab
+  - perl
+  - bash
+  - shell
+
+frontend:
+  - react
+  - reactjs
+  - react.js
+  - vue
+  - vuejs
+  - vue.js
+  - angular
+  - angularjs
+  - svelte
+  - nextjs
+  - next.js
+  - nuxtjs
+  - nuxt.js
+  - html
+  - css
+  - sass
+  - scss
+  - tailwind
+  - bootstrap
+  - webpack
+  - vite
+  - figma
+  - tailwindcss
+
+backend:
+  - node.js
+  - nodejs
+  - express
+  - expressjs
+  - django
+  - flask
+  - fastapi
+  - spring
+  - spring boot
+  - laravel
+  - rails
+  - ruby on rails
+  - nestjs
+  - graphql
+  - rest api
+  - restful api
+  - grpc
+
+databases:
+  - postgresql
+  - postgres
+  - mysql
+  - mongodb
+  - redis
+  - elasticsearch
+  - cassandra
+  - sqlite
+  - oracle
+  - mssql
+  - sql server
+  - dynamodb
+  - firestore
+  - neo4j
+  - influxdb
+  - clickhouse
+
+cloud:
+  - aws
+  - azure
+  - gcp
+  - google cloud
+  - amazon web services
+  - ec2
+  - s3
+  - lambda
+  - kubernetes
+  - k8s
+  - docker
+  - terraform
+  - ansible
+  - helm
+  - ecs
+  - eks
+  - gke
+  - cloudformation
+  - pulumi
+
+data:
+  - machine learning
+  - deep learning
+  - nlp
+  - natural language processing
+  - computer vision
+  - tensorflow
+  - pytorch
+  - keras
+  - scikit-learn
+  - pandas
+  - numpy
+  - spark
+  - pyspark
+  - hadoop
+  - tableau
+  - power bi
+  - looker
+  - dbt
+  - airflow
+  - mlflow
+  - opencv
+  - huggingface
+
+mobile:
+  - android
+  - ios
+  - react native
+  - flutter
+  - dart
+  - xcode
+  - swiftui
+  - jetpack compose
+
+devops:
+  - ci/cd
+  - jenkins
+  - github actions
+  - gitlab ci
+  - circleci
+  - travis ci
+  - argocd
+  - prometheus
+  - grafana
+  - datadog
+  - splunk
+  - elk stack
+  - linux
+  - nginx
+  - apache
+
+testing:
+  - pytest
+  - jest
+  - mocha
+  - selenium
+  - cypress
+  - playwright
+  - unit testing
+  - integration testing
+  - tdd
+  - bdd
+
+soft_skills:
+  - communication
+  - problem solving
+  - teamwork
+  - leadership
+  - agile
+  - scrum
+  - kanban
+  - jira
+  - confluence
+
+finance_domain:
+  - fintech
+  - payment gateway
+  - razorpay
+  - stripe
+  - banking
+  - accounting
+  - taxation
+  - gst
+  - tally
+
+general:
+  - api
+  - microservices
+  - system design
+  - data structures
+  - algorithms
+  - git
+  - linux
+  - sql
+  - nosql
+  - oops
+  - object oriented
+  - design patterns
+  - kafka
+  - rabbitmq
+  - celery
+  - websockets

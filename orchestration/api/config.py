@@ -16,6 +16,10 @@ class DatabaseConfig(BaseSettings):
     )
     db_pool_size: int = Field(default=10, alias="DB_POOL_SIZE")
     db_max_overflow: int = Field(default=20, alias="DB_MAX_OVERFLOW")
+    use_alembic_migrations: bool = Field(
+        default=False,
+        alias="USE_ALEMBIC_MIGRATIONS",
+    )
 
 
 class APIConfig(BaseSettings):

@@ -45,6 +45,45 @@ uvicorn orchestration.api.main:app --reload --port 8000
 | GET | `/api/admin/variants-pending` | All variants awaiting approval |
 | GET | `/api/admin/applications-log` | Recent applications (paginated) |
 | GET | `/api/admin/scraper-runs` | Recent scraper run history |
+| POST | `/api/company-discovery/start` | Trigger keyword-driven company discovery run |
+| POST | `/api/company-discovery/bootstrap` | Trigger bootstrap source import |
+| GET | `/api/company-discovery/status/{run_id}` | Discovery run status and company counts |
+| GET | `/api/company-discovery/companies` | Paginated company list with crawl_status filter |
+| GET | `/api/company-discovery/stats` | Enrichment stats, email stats, ATS breakdown |
+| POST | `/api/career-jobs/start` | Trigger career page job scrape |
+| GET | `/api/career-jobs/status/{run_id}` | Career scrape run status and job counts |
+| GET | `/api/career-jobs/latest` | Paginated active career page jobs |
+| GET | `/api/career-jobs/counts` | Aggregated counts by company, status, extraction method |
+
+---
+
+## Database Migrations (Alembic)
+
+Migrations are managed with Alembic (`alembic.ini` at project root).
+
+```bash
+# Mark existing database as baseline (run once on existing installs)
+alembic stamp 0001_baseline
+
+# Apply all pending migrations
+alembic upgrade head
+
+# Check current revision
+alembic current
+
+# Generate a new autogenerate migration
+alembic revision --autogenerate -m "describe change here"
+```
+
+Migration files live in `orchestration/alembic/versions/`. Current chain:
+
+| Revision | Description |
+|---|---|
+| `0001_baseline` | No-op — marks existing schema (001+002 SQL files) as applied |
+| `0002_add_companies` | Creates `companies` table for Module 1 |
+| `0003_add_career_jobs` | Creates `career_jobs` table for Module 2 |
+
+Set `USE_ALEMBIC_MIGRATIONS=true` in `.env` to skip `create_all` on startup and rely solely on Alembic (recommended for production).
 
 ---
 
@@ -58,12 +97,14 @@ orchestration/
 │   ├── middleware.py    # RequestID, Logging, ErrorHandling, CORS
 │   ├── dependencies.py  # DI: get_db_session, get_mail_service, get_job_registry, etc.
 │   └── routes/
-│       ├── scraper.py   # /api/scraper/* endpoints
-│       ├── ai.py        # /api/ai/* endpoints
-│       ├── resume.py    # /api/resume/upload endpoint
-│       ├── mail.py      # /api/mail/* endpoints
-│       ├── admin.py     # /api/admin/* endpoints
-│       └── health.py    # /health and /readiness endpoints
+│       ├── scraper.py              # /api/scraper/* endpoints
+│       ├── ai.py                   # /api/ai/* endpoints
+│       ├── resume.py               # /api/resume/upload endpoint
+│       ├── mail.py                 # /api/mail/* endpoints
+│       ├── admin.py                # /api/admin/* endpoints
+│       ├── health.py               # /health and /readiness endpoints
+│       ├── company_discovery.py    # /api/company-discovery/* endpoints
+│       └── career_jobs.py          # /api/career-jobs/* endpoints
 ├── core/
 │   ├── exceptions.py    # Domain exceptions (ApprovalRequiredError, MailSendError, etc.)
 │   ├── logging_setup.py # Structured JSON logging with trace/span ID injection
@@ -72,9 +113,17 @@ orchestration/
 │   └── metrics.py       # Business metric instruments (login_total, ai_request_duration, etc.)
 ├── db/
 │   ├── connection.py    # Async engine, session factory
-│   ├── models.py        # SQLAlchemy ORM (6 models)
+│   ├── models.py        # SQLAlchemy ORM (8 models — includes Company, CareerJob)
 │   └── migrations/
-│       └── 001_init_schema.sql
+│       ├── 001_init_schema.sql
+│       └── 002_auth_schema.sql
+├── alembic/
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│       ├── 0001_baseline_existing_schema.py
+│       ├── 0002_add_companies_table.py
+│       └── 0003_add_career_jobs_table.py
 ├── repositories/
 │   ├── postgres_job_repository.py
 │   ├── postgres_variant_repository.py
@@ -86,7 +135,9 @@ orchestration/
 │   ├── ai_service.py
 │   ├── approval_service.py
 │   ├── storage_service.py
-│   └── mail_service.py  # Mail-Bridge HTTP client with 5 validation gates
+│   ├── mail_service.py               # Mail-Bridge HTTP client with 5 validation gates
+│   ├── company_discovery_service.py  # Company discovery run management
+│   └── career_jobs_service.py        # Career page job scrape management
 ├── static/
 │   └── admin/
 │       └── index.html   # Admin dashboard UI (Tailwind + auto-refresh)
@@ -94,7 +145,9 @@ orchestration/
 │   ├── test_repositories_postgres.py
 │   ├── test_scraper_routes.py
 │   ├── test_ai_integration.py
-│   └── test_mail_integration.py
+│   ├── test_mail_integration.py
+│   ├── test_company_discovery_routes.py
+│   └── test_career_jobs_routes.py
 ├── requirements.txt
 └── .env.example
 ```
@@ -103,7 +156,7 @@ orchestration/
 
 ## Database Schema
 
-6 PostgreSQL tables created by `db/migrations/001_init_schema.sql`:
+8 PostgreSQL tables across 3 migration files:
 
 | Table | Description |
 |---|---|
@@ -112,7 +165,9 @@ orchestration/
 | `resume_variants` | AI-generated variants — `UNIQUE(user_id, job_id)` |
 | `cover_letters` | Generated cover letters |
 | `application_log` | Sent applications — `UNIQUE(user_id, job_id)` |
-| `scraper_runs` | Audit log for scraper executions |
+| `scraper_runs` | Audit log for all scraper/discovery executions |
+| `companies` | Company records from Module 1 discovery — `UNIQUE(apex_domain)` |
+| `career_jobs` | Job listings from Module 2 career page scraper — `UNIQUE(company_id, url_hash)` |
 
 Apply schema:
 

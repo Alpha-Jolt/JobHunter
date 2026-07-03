@@ -6,7 +6,7 @@ JobHunter automates job discovery, tailors your resume using AI, sends applicati
 
 The platform is built around one guarantee: **no false data ever enters your resume.** Every AI-generated document requires explicit user approval before it goes anywhere.
 
-> **Status:** Phase 0 — In Progress | **Target Platforms:** Web _(Beta)_
+> **Status:** Phase 1 — In Progress | **Target Platforms:** Web _(Beta)_
 
 ---
 
@@ -18,6 +18,7 @@ This data drives the scraper configuration.
 
 ### Scraper Engine
 Pulls job listings from LinkedIn, Naukri, Indeed, and other sources via n8n-orchestrated workflows.\
+Also discovers companies directly and extracts job listings from their career pages — a third independent channel.\
 All data is stored in a private PostgreSQL database. **The dataset is never exported externally.**
 
 ### Viewer
@@ -68,8 +69,6 @@ The product is built in five phases:
 | **3 — Skill Development & Monetisation** | Program portal, mentor sessions, payments, subscriptions |
 | **4 — Scale, Compliance & Partnerships** | Placement verification, GDPR/DPDPA, abuse prevention, integrations |
 
-Phase 0 is the internal engineering sprint that proves the core job-to-application loop works end-to-end before any user-facing product is built.
-
 ---
 
 ## Key Principles
@@ -110,17 +109,21 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 
 | Module | Status |
 |---|---|
-| Scraper Engine | ✅ Complete |
-| Data Persistence Layer (DPL) | ✅ Complete |
+| Scraper Engine (Naukri + Indeed) | ✅ Complete |
+| Data Persistence Layer (DPL v0.3.0) | ✅ Complete |
 | AI Engine + Approval Workflow | ✅ Complete |
 | MinIO S3 Storage | ✅ Complete |
 | Shared Registry Service | ✅ Complete |
 | Orchestration API | ✅ Complete |
+| Database Migrations (Alembic) | ✅ Complete |
 | Mail Service Integration | ✅ Complete |
 | Admin Dashboard | ✅ Complete |
 | Auth & RBAC | ✅ Complete |
 | Frontend Webapp | ✅ Complete |
 | Observability (OTel) | ✅ Complete |
+| Module 1 — Company Discovery Scraper | ✅ Complete |
+| Module 2 — Career Page Job Scraper | ✅ Complete |
+| Orchestration API — Company Discovery & Career Jobs routes | 🔄 In Progress |
 
 ---
 

@@ -55,3 +55,7 @@ class RateLimiter:
             # No limit configured — allow immediately
             return
         await self._buckets[domain].acquire(tokens)
+    async def wait(self, domain: str, tokens: float = 1.0) -> None:
+        """Alias for acquire() — wait until a token is available for the given domain."""
+        await self.acquire(domain, tokens)
+
