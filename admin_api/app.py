@@ -14,6 +14,7 @@ from core.rate_limit import limiter
 from core.security import SecurityHeadersMiddleware
 from auth.router import router as auth_router
 from scraper.router import router as scraper_router
+from company_discovery.router import router as company_discovery_router
 from core.db import engine, Base
 
 logging.basicConfig(level=settings.LOG_LEVEL)
@@ -51,6 +52,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(scraper_router, prefix="/api/scraper", tags=["scraper"])
+app.include_router(company_discovery_router, prefix="/api", tags=["company-discovery"])
 
 @app.get("/health")
 async def health_check():

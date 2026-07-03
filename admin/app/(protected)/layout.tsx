@@ -3,7 +3,7 @@
 import { useAuthStore } from "@/features/auth/authStore";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard } from "lucide-react";
+import { LogOut, LayoutDashboard, Building2, Briefcase } from "lucide-react";
 
 export default function ProtectedLayout({
   children,
@@ -31,6 +31,14 @@ export default function ProtectedLayout({
           <a href="/dashboard/scraper" className="flex items-center gap-3 p-3 rounded bg-gray-800 text-gray-200 hover:text-white">
             <LayoutDashboard size={20} />
             Scraper
+          </a>
+          <a href="/dashboard/company-discovery" className="flex items-center gap-3 p-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white">
+            <Building2 size={20} />
+            Company Discovery
+          </a>
+          <a href="/dashboard/company-discovery/career-jobs" className="flex items-center gap-3 p-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white">
+            <Briefcase size={20} />
+            Career Jobs
           </a>
         </nav>
         <div className="p-4 border-t border-gray-800">

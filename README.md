@@ -123,7 +123,8 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 | Observability (OTel) | ✅ Complete |
 | Module 1 — Company Discovery Scraper | ✅ Complete |
 | Module 2 — Career Page Job Scraper | ✅ Complete |
-| Orchestration API — Company Discovery & Career Jobs routes | 🔄 In Progress |
+| Orchestration API — Company Discovery & Career Jobs routes | ✅ Complete |
+| Admin Dashboard — Company Discovery & Career Jobs UI | ✅ Complete |
 
 ---
 

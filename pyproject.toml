@@ -18,11 +18,14 @@ exclude = '''
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["scraper/tests", "ai_engine/tests"]
+testpaths = ["scraper/tests", "ai_engine/tests", "orchestration/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "--cov=scraper --cov=ai_engine --cov-report=term-missing"
+markers = [
+    "exit_criteria: marks tests that verify phase exit criteria against a live database (deselect with '-m not exit_criteria')",
+]
 
 [tool.coverage.run]
 omit = [

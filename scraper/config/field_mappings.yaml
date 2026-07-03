@@ -15,3 +15,47 @@ naukri:
   description: "jobDescription"
   posted_date: "footerPlaceholderLabel"
   skills: "tagsAndSkills"
+
+career_page:
+  # JSON-LD (Schema.org JobPosting) field mappings
+  json_ld:
+    title: "title"
+    description: "description"
+    location: "jobLocation.address.addressLocality"
+    salary_min: "baseSalary.value.minValue"
+    salary_max: "baseSalary.value.maxValue"
+    employment_type: "employmentType"
+    date_posted: "datePosted"
+    url: "url"
+
+  # Employment type normalisation (Schema.org → canonical job_type values)
+  employment_type_map:
+    FULL_TIME: "fulltime"
+    PART_TIME: "parttime"
+    CONTRACTOR: "contract"
+    INTERN: "internship"
+    TEMPORARY: "contract"
+    VOLUNTEER: "contract"
+    OTHER: "fulltime"
+
+  # ATS API response field mappings
+  greenhouse:
+    title: "title"
+    url: "absolute_url"
+    description: "content"
+    location: "location.name"
+    posted_at: "updated_at"
+
+  lever:
+    title: "text"
+    url: "hostedUrl"
+    description: "descriptionPlain"
+    location: "categories.location"
+    posted_at: "createdAt"
+
+  ashby:
+    title: "title"
+    url: "jobUrl"
+    description: "descriptionHtml"
+    location: "locationName"
+    posted_at: "publishedAt"

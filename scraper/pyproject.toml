@@ -28,6 +28,9 @@ exclude = '''
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "--cov=scraper --cov-report=term-missing"
+markers = [
+    "exit_criteria: marks tests that verify phase exit criteria against a live database",
+]
 
 [tool.flake8]
 max-line-length = 100
