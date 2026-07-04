@@ -1,151 +1,186 @@
-"""Company discovery and career jobs proxy router for the Admin API.
+"""Company discovery and career jobs router for the Admin API.
 
-Forwards requests to the Orchestration API and returns responses.
-All endpoints require an active admin session.
+Replaces the previous HTTP proxy. Writes directly to Redis (task queue)
+and PostgreSQL (audit log + read queries). All endpoints require an active
+admin session.
 """
 
 import logging
 from typing import Optional
 
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+import redis.asyncio as redis
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth.dependencies import require_admin_session
-from core.config import settings
+from core.db import get_db
+from core.redis import get_redis
 from company_discovery.models import (
     BootstrapRequest,
     StartCareerScrapeRequest,
     StartDiscoveryRequest,
 )
+from company_discovery import service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(require_admin_session)])
 
-# Base URL of the Orchestration API (same network, no auth header needed
-# because admin_api already validates the session before forwarding)
-_ORCH_BASE = getattr(settings, "ORCHESTRATION_API_URL", "http://orchestration:8000")
-_TIMEOUT = 30.0
-
-
-async def _forward(
-    method: str,
-    path: str,
-    token: str,
-    **kwargs,
-) -> dict:
-    """Forward a request to the Orchestration API.
-
-    Args:
-        method: HTTP method string.
-        path: API path (without base URL).
-        token: Bearer token to forward for RBAC.
-        **kwargs: Additional arguments passed to httpx request.
-
-    Returns:
-        Parsed JSON response dict.
-
-    Raises:
-        HTTPException: On non-2xx response or network error.
-    """
-    url = f"{_ORCH_BASE}{path}"
-    headers = {"Authorization": f"Bearer {token}"}
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await getattr(client, method)(url, headers=headers, **kwargs)
-        if resp.status_code >= 400:
-            raise HTTPException(status_code=resp.status_code, detail=resp.text)
-        return resp.json()
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Orchestration API forward failed", exc_info=exc)
-        raise HTTPException(status_code=502, detail="Orchestration API unreachable")
-
-
-def _get_token(request: Request) -> str:
-    """Extract Bearer token from the incoming request."""
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        return auth[7:]
-    return ""
-
 
 # ── Company Discovery ─────────────────────────────────────────────────────────
 
 @router.post("/company-discovery/start")
-async def start_discovery(body: StartDiscoveryRequest, request: Request):
+async def start_discovery(
+    body: StartDiscoveryRequest,
+    db: AsyncSession = Depends(get_db),
+    r: redis.Redis = Depends(get_redis),
+):
     """Trigger keyword-driven company discovery."""
-    return await _forward("post", "/api/company-discovery/start", _get_token(request), json=body.model_dump())
+    from datetime import datetime, timezone
+
+    payload = {
+        "role": body.role,
+        "location": body.location,
+        "experience": body.experience,
+        "salary": body.salary,
+    }
+    run_id = await service.create_run_and_enqueue(
+        db=db,
+        r=r,
+        task_type="search_discovery",
+        source=f"{body.role} {body.location}",
+        payload=payload,
+    )
+    return {
+        "run_id": run_id,
+        "status": "queued",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.post("/company-discovery/bootstrap")
-async def run_bootstrap(body: BootstrapRequest, request: Request):
+async def run_bootstrap(
+    body: BootstrapRequest,
+    db: AsyncSession = Depends(get_db),
+    r: redis.Redis = Depends(get_redis),
+):
     """Trigger bootstrap source import."""
-    return await _forward("post", "/api/company-discovery/bootstrap", _get_token(request), json=body.model_dump())
+    from datetime import datetime, timezone
+
+    payload = {"sources": body.sources}
+    run_id = await service.create_run_and_enqueue(
+        db=db,
+        r=r,
+        task_type="company_discovery_bootstrap",
+        source="bootstrap",
+        payload=payload,
+    )
+    return {
+        "run_id": run_id,
+        "status": "queued",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/company-discovery/status/{run_id}")
-async def get_discovery_status(run_id: str, request: Request):
+async def get_discovery_status(
+    run_id: str,
+    r: redis.Redis = Depends(get_redis),
+):
     """Return status for a discovery run."""
-    return await _forward("get", f"/api/company-discovery/status/{run_id}", _get_token(request))
+    status = await service.get_run_status(run_id, r)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+    return status
 
 
 @router.get("/company-discovery/companies")
 async def list_companies(
-    request: Request,
     crawl_status: Optional[str] = Query(default=None),
     ats_platform: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
 ):
     """Return paginated company list."""
-    params = {"limit": limit, "offset": offset}
-    if crawl_status:
-        params["crawl_status"] = crawl_status
-    if ats_platform:
-        params["ats_platform"] = ats_platform
-    return await _forward("get", "/api/company-discovery/companies", _get_token(request), params=params)
+    companies, total = await service.get_companies(
+        db=db,
+        crawl_status=crawl_status,
+        ats_platform=ats_platform,
+        limit=limit,
+        offset=offset,
+    )
+    return {"companies": companies, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/company-discovery/stats")
-async def get_company_stats(request: Request):
+async def get_company_stats(
+    db: AsyncSession = Depends(get_db),
+):
     """Return company enrichment statistics."""
-    return await _forward("get", "/api/company-discovery/stats", _get_token(request))
+    return await service.get_company_stats(db)
 
 
 # ── Career Jobs ───────────────────────────────────────────────────────────────
 
 @router.post("/career-jobs/start")
-async def start_career_scrape(body: StartCareerScrapeRequest, request: Request):
+async def start_career_scrape(
+    body: StartCareerScrapeRequest,
+    db: AsyncSession = Depends(get_db),
+    r: redis.Redis = Depends(get_redis),
+):
     """Trigger a career page scrape run."""
-    return await _forward("post", "/api/career-jobs/start", _get_token(request), json=body.model_dump())
+    from datetime import datetime, timezone
+
+    payload = {"company_id": body.company_id}
+    run_id = await service.create_run_and_enqueue(
+        db=db,
+        r=r,
+        task_type="career_page_scrape",
+        source="career_page_scrape",
+        payload=payload,
+    )
+    return {
+        "run_id": run_id,
+        "status": "queued",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/career-jobs/status/{run_id}")
-async def get_career_scrape_status(run_id: str, request: Request):
+async def get_career_scrape_status(
+    run_id: str,
+    r: redis.Redis = Depends(get_redis),
+):
     """Return status for a career scrape run."""
-    return await _forward("get", f"/api/career-jobs/status/{run_id}", _get_token(request))
+    status = await service.get_run_status(run_id, r)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+    return status
 
 
 @router.get("/career-jobs/latest")
 async def get_latest_career_jobs(
-    request: Request,
     company_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
 ):
     """Return paginated active career jobs."""
-    params = {"limit": limit, "offset": offset}
-    if company_id:
-        params["company_id"] = company_id
-    if status:
-        params["status"] = status
-    return await _forward("get", "/api/career-jobs/latest", _get_token(request), params=params)
+    jobs, total = await service.get_latest_jobs(
+        db=db,
+        company_id=company_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    return {"jobs": jobs, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/career-jobs/counts")
-async def get_career_job_counts(request: Request):
+async def get_career_job_counts(
+    db: AsyncSession = Depends(get_db),
+):
     """Return aggregated career job counts."""
-    return await _forward("get", "/api/career-jobs/counts", _get_token(request))
+    return await service.get_job_counts(db)

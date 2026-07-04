@@ -1,7 +1,9 @@
-"""Career jobs service — manages career page scrape runs and job inventory queries."""
+"""Career jobs service — read-only job inventory queries.
+
+Trigger and status methods have moved to admin_api/company_discovery/service.py.
+"""
 
 import uuid
-from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import orchestration.db.models as _db_models
@@ -10,63 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class CareerJobsService:
-    """High-level career page job operations backed by PostgreSQL."""
+    """Read-only career page job queries backed by PostgreSQL."""
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
-
-    async def trigger_scrape(
-        self, company_id: Optional[uuid.UUID] = None
-    ) -> uuid.UUID:
-        """Create a scraper_run record for a career page scrape and return its run_id.
-
-        Args:
-            company_id: If provided, scrape only this company.
-                        If None, scrape all enriched companies.
-
-        Returns:
-            UUID of the created scraper_run record.
-        """
-        keywords = [str(company_id)] if company_id else ["all"]
-        run = _db_models.ScraperRun(
-            run_id=str(uuid.uuid4()),
-            source="career_page_scrape",
-            keywords=keywords,
-            locations=[],
-            pages_requested=1,
-            status="queued",
-            started_at=datetime.now(timezone.utc),
-        )
-        self._session.add(run)
-        await self._session.flush()
-        return uuid.UUID(run.run_id)
-
-    async def get_run_status(self, run_id: uuid.UUID) -> Optional[Dict]:
-        """Return status dict for a career page scrape run.
-
-        Args:
-            run_id: UUID of the scraper_run record.
-
-        Returns:
-            Status dict or None if not found.
-        """
-        ScraperRun = _db_models.ScraperRun
-        result = await self._session.execute(
-            select(ScraperRun).where(ScraperRun.run_id == str(run_id))
-        )
-        row = result.scalar_one_or_none()
-        if row is None:
-            return None
-        return {
-            "run_id": str(row.run_id),
-            "source": row.source,
-            "started_at": row.started_at.isoformat() if row.started_at else None,
-            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
-            "status": row.status,
-            "jobs_found": row.jobs_inserted,
-            "errors": row.errors,
-            "error_detail": row.error_detail,
-        }
 
     async def get_latest_jobs(
         self,
@@ -145,14 +94,12 @@ class CareerJobsService:
             ))
         }
 
-        # Count companies with active jobs
         active_company_count = (await self._session.execute(
             select(func.count(func.distinct(CareerJob.company_id))).where(
                 CareerJob.status == "active"
             )
         )).scalar() or 0
 
-        # Count jobs with apply_email or apply_url
         with_apply_contact = (await self._session.execute(
             select(func.count()).select_from(CareerJob).where(
                 (CareerJob.apply_email.isnot(None)) | (CareerJob.apply_url.isnot(None))

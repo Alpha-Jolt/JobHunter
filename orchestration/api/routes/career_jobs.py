@@ -1,10 +1,13 @@
-"""Career jobs API routes — /api/career-jobs/*"""
+"""Career jobs API routes — /api/career-jobs/*
 
-import uuid
+Read-only endpoints for job-seeker-facing use.
+Trigger and status endpoints have moved to admin_api.
+"""
+
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from orchestration.api.dependencies import get_db_session
@@ -15,31 +18,7 @@ from orchestration.services.career_jobs_service import CareerJobsService
 router = APIRouter(prefix="/api/career-jobs", tags=["career-jobs"])
 
 
-# ── Request / Response schemas ───────────────────────────────────────────────
-
-class StartCareerScrapeRequest(BaseModel):
-    company_id: Optional[str] = Field(
-        default=None,
-        description="Scrape a single company by UUID. Omit to scrape all enriched companies.",
-    )
-
-
-class CareerScrapeRunResponse(BaseModel):
-    run_id: str
-    status: str
-    started_at: str
-
-
-class CareerScrapeStatusResponse(BaseModel):
-    run_id: str
-    source: str
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    status: str
-    jobs_found: int
-    errors: int
-    error_detail: Optional[str]
-
+# ── Response schemas ──────────────────────────────────────────────────────────
 
 class CareerJobResponse(BaseModel):
     career_job_id: str
@@ -84,58 +63,6 @@ class CareerJobsCountsResponse(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post(
-    "/start",
-    response_model=CareerScrapeRunResponse,
-    status_code=201,
-    dependencies=[Depends(require_role(RoleEnum.ADMIN))],
-)
-async def start_career_scrape(
-    body: StartCareerScrapeRequest,
-    session: AsyncSession = Depends(get_db_session),
-) -> CareerScrapeRunResponse:
-    """Trigger a career page job scrape run.
-
-    If company_id is provided, scrapes only that company.
-    Otherwise scrapes all enriched companies in the companies table.
-    """
-    from datetime import datetime, timezone
-
-    company_uuid: Optional[uuid.UUID] = None
-    if body.company_id:
-        try:
-            company_uuid = uuid.UUID(body.company_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=422, detail=f"Invalid company_id UUID: {body.company_id}"
-            )
-
-    service = CareerJobsService(session)
-    run_id = await service.trigger_scrape(company_id=company_uuid)
-    return CareerScrapeRunResponse(
-        run_id=str(run_id),
-        status="queued",
-        started_at=datetime.now(timezone.utc).isoformat(),
-    )
-
-
-@router.get(
-    "/status/{run_id}",
-    response_model=CareerScrapeStatusResponse,
-    dependencies=[Depends(require_role(RoleEnum.ADMIN))],
-)
-async def get_career_scrape_status(
-    run_id: uuid.UUID,
-    session: AsyncSession = Depends(get_db_session),
-) -> CareerScrapeStatusResponse:
-    """Return status and job counts for a career page scrape run."""
-    service = CareerJobsService(session)
-    data = await service.get_run_status(run_id)
-    if data is None:
-        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
-    return CareerScrapeStatusResponse(**data)
-
-
 @router.get(
     "/latest",
     response_model=CareerJobsListResponse,
@@ -153,6 +80,8 @@ async def get_latest_career_jobs(
     session: AsyncSession = Depends(get_db_session),
 ) -> CareerJobsListResponse:
     """Return paginated active career page jobs ordered by last_seen_at DESC."""
+    import uuid
+
     company_uuid: Optional[uuid.UUID] = None
     if company_id:
         try:

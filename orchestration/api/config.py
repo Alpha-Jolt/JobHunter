@@ -37,6 +37,7 @@ class APIConfig(BaseSettings):
     max_applications_per_day: int = Field(default=10, alias="MAX_APPLICATIONS_PER_DAY")
     max_variants_per_session: int = Field(default=15, alias="MAX_VARIANTS_PER_SESSION")
     max_variants_total: int = Field(default=50, alias="MAX_VARIANTS_TOTAL")
+    internal_api_key: str = Field(alias="INTERNAL_API_KEY")
 
     @field_validator("approval_token_secret")
     @classmethod

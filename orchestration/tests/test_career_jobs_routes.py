@@ -1,4 +1,8 @@
-"""Tests for /api/career-jobs/* routes using FastAPI TestClient."""
+"""Tests for /api/career-jobs/* routes using FastAPI TestClient.
+
+Only GET /latest and GET /counts are tested here.
+POST /start and GET /status/{run_id} have moved to admin_api.
+"""
 
 import uuid
 from datetime import datetime as _dt, timedelta as _td, timezone as _tz
@@ -14,7 +18,6 @@ from orchestration.auth.tokens import encode_access_token as _encode
 _TEST_SECRET = "test-secret-key-that-is-32-chars!!"
 _TEST_ALG = "HS256"
 
-_FAKE_RUN_ID = str(uuid.uuid4())
 _FAKE_COMPANY_ID = str(uuid.uuid4())
 _FAKE_JOB_ID = str(uuid.uuid4())
 
@@ -87,113 +90,6 @@ def client():
         yield c
 
 
-# ── POST /api/career-jobs/start ──────────────────────────────────────────────
-
-class TestStartCareerScrape:
-    def test_returns_201_all_companies(self, client):
-        mock_service = MagicMock()
-        mock_service.trigger_scrape = AsyncMock(return_value=uuid.UUID(_FAKE_RUN_ID))
-
-        p1, p2, p3 = _patch_auth()
-        with p1, p2, p3:
-            with patch(
-                "orchestration.api.routes.career_jobs.CareerJobsService",
-                return_value=mock_service,
-            ):
-                resp = client.post(
-                    "/api/career-jobs/start",
-                    json={},
-                    headers=_auth_headers(),
-                )
-
-        assert resp.status_code == 201
-        data = resp.json()
-        assert data["run_id"] == _FAKE_RUN_ID
-        assert data["status"] == "queued"
-
-    def test_returns_201_single_company(self, client):
-        mock_service = MagicMock()
-        mock_service.trigger_scrape = AsyncMock(return_value=uuid.UUID(_FAKE_RUN_ID))
-
-        p1, p2, p3 = _patch_auth()
-        with p1, p2, p3:
-            with patch(
-                "orchestration.api.routes.career_jobs.CareerJobsService",
-                return_value=mock_service,
-            ):
-                resp = client.post(
-                    "/api/career-jobs/start",
-                    json={"company_id": _FAKE_COMPANY_ID},
-                    headers=_auth_headers(),
-                )
-
-        assert resp.status_code == 201
-        mock_service.trigger_scrape.assert_called_once_with(
-            company_id=uuid.UUID(_FAKE_COMPANY_ID)
-        )
-
-    def test_rejects_invalid_company_uuid(self, client):
-        p1, p2, p3 = _patch_auth()
-        with p1, p2, p3:
-            resp = client.post(
-                "/api/career-jobs/start",
-                json={"company_id": "not-a-uuid"},
-                headers=_auth_headers(),
-            )
-        assert resp.status_code == 422
-
-    def test_requires_auth(self, client):
-        resp = client.post("/api/career-jobs/start", json={})
-        assert resp.status_code == 401
-
-
-# ── GET /api/career-jobs/status/{run_id} ─────────────────────────────────────
-
-class TestCareerScrapeStatus:
-    def test_returns_status_for_known_run(self, client):
-        mock_service = MagicMock()
-        mock_service.get_run_status = AsyncMock(return_value={
-            "run_id": _FAKE_RUN_ID,
-            "source": "career_page_scrape",
-            "started_at": "2026-07-03T10:00:00+00:00",
-            "completed_at": None,
-            "status": "running",
-            "jobs_found": 125,
-            "errors": 0,
-            "error_detail": None,
-        })
-
-        p1, p2, p3 = _patch_auth()
-        with p1, p2, p3:
-            with patch(
-                "orchestration.api.routes.career_jobs.CareerJobsService",
-                return_value=mock_service,
-            ):
-                resp = client.get(
-                    f"/api/career-jobs/status/{_FAKE_RUN_ID}",
-                    headers=_auth_headers(),
-                )
-
-        assert resp.status_code == 200
-        assert resp.json()["jobs_found"] == 125
-
-    def test_returns_404_for_unknown_run(self, client):
-        mock_service = MagicMock()
-        mock_service.get_run_status = AsyncMock(return_value=None)
-
-        p1, p2, p3 = _patch_auth()
-        with p1, p2, p3:
-            with patch(
-                "orchestration.api.routes.career_jobs.CareerJobsService",
-                return_value=mock_service,
-            ):
-                resp = client.get(
-                    f"/api/career-jobs/status/{uuid.uuid4()}",
-                    headers=_auth_headers(),
-                )
-        assert resp.status_code == 404
-
-
 # ── GET /api/career-jobs/latest ──────────────────────────────────────────────
 
 class TestLatestCareerJobs:
@@ -243,6 +139,10 @@ class TestLatestCareerJobs:
             )
         assert resp.status_code == 422
 
+    def test_requires_auth(self, client):
+        resp = client.get("/api/career-jobs/latest")
+        assert resp.status_code == 401
+
 
 # ── GET /api/career-jobs/counts ──────────────────────────────────────────────
 
@@ -276,3 +176,7 @@ class TestCareerJobCounts:
         assert data["total_jobs"] == 520
         assert data["active_companies_count"] == 180
         assert data["jobs_with_apply_contact"] == 490
+
+    def test_requires_auth(self, client):
+        resp = client.get("/api/career-jobs/counts")
+        assert resp.status_code == 401
