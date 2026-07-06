@@ -90,10 +90,6 @@ async def main():
             logger.error(f"Error pulling from queue: {e}")
             await asyncio.sleep(5)
 
-if __name__ == "__main__":
-    asyncio.run(main())
-
-
 # --- Company discovery task handlers ----------------------------------------
 
 async def _handle_company_discovery_bootstrap(
@@ -141,13 +137,15 @@ async def _handle_company_discovery_bootstrap(
             all_domains.extend(domains)
 
         enriched_count = 0
-        for domain in all_domains:
-            record = await pipeline.enrich(
-                raw_domain=domain,
-                source="bootstrap_dataset",
-            )
-            if record:
-                enriched_count += 1
+        async with get_session() as session:
+            for domain in all_domains:
+                record = await pipeline.enrich(
+                    raw_domain=domain,
+                    source="bootstrap_dataset",
+                )
+                if record:
+                    await _upsert_company(record, session)
+                    enriched_count += 1
 
         logger.info(f"Bootstrap task {task_id} complete: {enriched_count} companies enriched")
         await r.set(status_key, json.dumps({
@@ -191,14 +189,16 @@ async def _handle_search_discovery(
         )
 
         enriched_count = 0
-        for domain in domains:
-            record = await pipeline.enrich(
-                raw_domain=domain,
-                source="search_discovery",
-                source_detail=f"{payload.get('role')} {payload.get('location')}",
-            )
-            if record:
-                enriched_count += 1
+        async with get_session() as session:
+            for domain in domains:
+                record = await pipeline.enrich(
+                    raw_domain=domain,
+                    source="search_discovery",
+                    source_detail=f"{payload.get('role')} {payload.get('location')}",
+                )
+                if record:
+                    await _upsert_company(record, session)
+                    enriched_count += 1
 
         logger.info(f"Search discovery task {task_id} complete: {enriched_count} companies")
         await r.set(status_key, json.dumps({
@@ -498,6 +498,85 @@ async def _handle_ats_api_refresh(
 
 # --- Shared helpers ---------------------------------------------------------
 
+async def _upsert_company(record: dict, session) -> None:
+    """Upsert a single enriched company dict into the companies table.
+
+    On conflict (apex_domain): updates enrichment fields and merges email arrays.
+    On new: inserts full record.
+
+    Args:
+        record: Dict returned by EnrichmentPipeline.enrich().
+        session: Active SQLAlchemy async session.
+    """
+    import uuid as _uuid
+    from sqlalchemy import text
+
+    if not record or not record.get("apex_domain"):
+        return
+
+    try:
+        await session.execute(
+            text("""
+                INSERT INTO companies (
+                    company_id, company_name, normalized_name, apex_domain,
+                    subdomains, career_page_url, career_emails, contact_emails,
+                    email_trust, ats_platform, industry, hq_location,
+                    source, source_detail, robots_txt_allowed,
+                    discovery_date, last_enriched_at, email_last_crawled_at,
+                    crawl_status, dedup_fingerprint
+                ) VALUES (
+                    :company_id, :company_name, :normalized_name, :apex_domain,
+                    :subdomains, :career_page_url, :career_emails, :contact_emails,
+                    :email_trust, :ats_platform, :industry, :hq_location,
+                    :source, :source_detail, :robots_txt_allowed,
+                    :discovery_date, :last_enriched_at, :email_last_crawled_at,
+                    :crawl_status, :dedup_fingerprint
+                )
+                ON CONFLICT (apex_domain) DO UPDATE SET
+                    career_page_url = COALESCE(EXCLUDED.career_page_url, companies.career_page_url),
+                    career_emails = (
+                        SELECT ARRAY(SELECT DISTINCT UNNEST(companies.career_emails || EXCLUDED.career_emails))
+                    ),
+                    contact_emails = (
+                        SELECT ARRAY(SELECT DISTINCT UNNEST(companies.contact_emails || EXCLUDED.contact_emails))
+                    ),
+                    ats_platform = CASE
+                        WHEN companies.ats_platform = 'none' THEN EXCLUDED.ats_platform
+                        ELSE companies.ats_platform
+                    END,
+                    last_enriched_at = EXCLUDED.last_enriched_at,
+                    email_last_crawled_at = EXCLUDED.email_last_crawled_at,
+                    crawl_status = EXCLUDED.crawl_status
+            """),
+            {
+                "company_id": str(record.get("company_id") or _uuid.uuid4()),
+                "company_name": record.get("company_name"),
+                "normalized_name": record.get("normalized_name"),
+                "apex_domain": record["apex_domain"],
+                "subdomains": record.get("subdomains", []),
+                "career_page_url": record.get("career_page_url"),
+                "career_emails": record.get("career_emails", []),
+                "contact_emails": record.get("contact_emails", []),
+                "email_trust": record.get("email_trust", "unverified"),
+                "ats_platform": record.get("ats_platform", "none"),
+                "industry": record.get("industry"),
+                "hq_location": record.get("hq_location"),
+                "source": record.get("source", "bootstrap_dataset"),
+                "source_detail": record.get("source_detail"),
+                "robots_txt_allowed": record.get("robots_txt_allowed"),
+                "discovery_date": record.get("discovery_date"),
+                "last_enriched_at": record.get("last_enriched_at"),
+                "email_last_crawled_at": record.get("email_last_crawled_at"),
+                "crawl_status": record.get("crawl_status", "enriched"),
+                "dedup_fingerprint": record.get("dedup_fingerprint", ""),
+            },
+        )
+        await session.commit()
+    except Exception as exc:
+        logger.warning(f"Upsert failed for company {record.get('apex_domain')}: {exc}")
+        await session.rollback()
+
+
 async def _upsert_career_jobs(jobs: list[dict], session) -> int:
     """Upsert a list of extracted job dicts into the career_jobs table.
 
@@ -519,6 +598,17 @@ async def _upsert_career_jobs(jobs: list[dict], session) -> int:
 
     now = datetime.now(timezone.utc)
     upserted = 0
+
+    def _to_dt(val):
+        """Convert ISO string to datetime if needed; return datetime or None."""
+        if val is None:
+            return None
+        if isinstance(val, datetime):
+            return val
+        try:
+            return datetime.fromisoformat(str(val))
+        except (ValueError, TypeError):
+            return None
 
     for job in jobs:
         try:
@@ -578,9 +668,9 @@ async def _upsert_career_jobs(jobs: list[dict], session) -> int:
                     "apply_url": job.get("apply_url"),
                     "ats_platform": job.get("ats_platform"),
                     "extraction_method": job.get("extraction_method", "html_parse"),
-                    "posted_at": job.get("posted_at"),
-                    "scraped_at": job.get("scraped_at", now.isoformat()),
-                    "last_seen_at": job.get("last_seen_at", now.isoformat()),
+                    "posted_at": _to_dt(job.get("posted_at")),
+                    "scraped_at": _to_dt(job.get("scraped_at")) or now,
+                    "last_seen_at": _to_dt(job.get("last_seen_at")) or now,
                     "status": job.get("status", "raw"),
                     "source_channel": job.get("source_channel", "career_page"),
                 },
@@ -592,3 +682,7 @@ async def _upsert_career_jobs(jobs: list[dict], session) -> int:
             )
 
     return upserted
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

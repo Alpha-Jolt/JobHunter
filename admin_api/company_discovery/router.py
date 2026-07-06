@@ -132,7 +132,7 @@ async def start_career_scrape(
     """Trigger a career page scrape run."""
     from datetime import datetime, timezone
 
-    payload = {"company_id": body.company_id}
+    payload = {"company_id": str(body.company_id) if body.company_id else None}
     run_id = await service.create_run_and_enqueue(
         db=db,
         r=r,
@@ -168,6 +168,14 @@ async def get_latest_career_jobs(
     db: AsyncSession = Depends(get_db),
 ):
     """Return paginated active career jobs."""
+    import uuid as _uuid
+
+    if company_id is not None:
+        try:
+            _uuid.UUID(company_id)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid company_id UUID")
+
     jobs, total = await service.get_latest_jobs(
         db=db,
         company_id=company_id,

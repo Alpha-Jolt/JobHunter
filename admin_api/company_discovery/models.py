@@ -168,4 +168,4 @@ class BootstrapRequest(BaseModel):
 
 
 class StartCareerScrapeRequest(BaseModel):
-    company_id: Optional[str] = None
+    company_id: Optional[uuid.UUID] = None
