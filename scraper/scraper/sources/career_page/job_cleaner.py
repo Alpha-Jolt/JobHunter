@@ -13,6 +13,126 @@ from scraper.cleaning.salary_cleaner import SalaryCleaner
 
 logger = logging.getLogger(__name__)
 
+# --- Task 1: Title garbage validation ----------------------------------------
+
+# Navigation labels that are ALL_CAPS should be rejected
+_ALL_CAPS_RE = re.compile(r"^[A-Z0-9\s\-&/]+$")
+
+# Common navigation / site-structure labels (case-insensitive, full-string match)
+_NAV_TITLE_RE = re.compile(
+    r"^(contact(\s+us)?|careers?|apply(\s+(now|here))?|jobs?|"
+    r"hiring|join\s+us|open\s+positions?|current\s+openings?|"
+    r"home|about(\s+us)?|our\s+team|team|people|menu|search|"
+    r"login|sign\s+in|register|submit|back|next|view\s+all|"
+    r"work\s+with\s+us|our\s+impact|news(\s+&?\s+media)?|"
+    r"publications?|resources?|registry|admissions?|naac|"
+    r"privacy(\s+policy)?|press(\s+kit)?|investors?|partner)$",
+    re.IGNORECASE,
+)
+
+_MIN_TITLE_LENGTH = 5
+_MAX_TITLE_LENGTH = 120  # reject description-length strings extracted as titles
+
+
+def _is_garbage_title(title: str) -> bool:
+    """Return True if the title is a navigation/breadcrumb label, not a real job title.
+
+    Rejects:
+    - Titles that are ALL_CAPS (navigation pattern)
+    - Titles matching known navigation label patterns
+    - Titles shorter than MIN_TITLE_LENGTH characters
+
+    Args:
+        title: Cleaned job title string.
+
+    Returns:
+        True if title should be rejected.
+    """
+    if not title:
+        return True
+    stripped = title.strip()
+    if len(stripped) < _MIN_TITLE_LENGTH:
+        return True
+    if len(stripped) > _MAX_TITLE_LENGTH:
+        return True
+    if _ALL_CAPS_RE.match(stripped):
+        return True
+    if _NAV_TITLE_RE.match(stripped):
+        return True
+    return False
+
+
+# --- Task 2: Email extraction from job descriptions --------------------------
+
+# Contextual email extraction patterns (high-confidence proximity signals)
+_DESCRIPTION_EMAIL_PATTERNS = [
+    re.compile(
+        r"send\s+(?:your\s+)?(?:cv|resume|application)(?:\s+to)?\s+"
+        r"([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"apply\s+(?:at|to)\s+"
+        r"([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?:email|mail|contact|reach|write)\s+(?:us\s+)?(?:at|to)?\s*:?\s*"
+        r"([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})",
+        re.IGNORECASE,
+    ),
+    # High-signal prefix patterns — HR/career local parts anywhere in text
+    re.compile(
+        r"\b((?:careers?|hr|jobs?|recruitment|talent|hiring|people|"
+        r"staffing|apply|applications?)@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})",
+        re.IGNORECASE,
+    ),
+]
+
+_EMAIL_VALIDATE_RE = re.compile(
+    r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+)
+
+_FREE_WEBMAIL = frozenset([
+    "gmail.com", "yahoo.com", "yahoo.co.in", "hotmail.com", "rediffmail.com",
+    "outlook.com", "ymail.com", "live.com", "aol.com", "protonmail.com",
+])
+
+
+def extract_emails_from_description(description: str) -> List[str]:
+    """Extract apply email addresses from job description text.
+
+    Uses contextual proximity patterns — never guesses, only extracts
+    explicitly published addresses from "send your CV to", "apply at",
+    "email us at", and high-signal HR local-part patterns.
+
+    Args:
+        description: Raw or cleaned job description text.
+
+    Returns:
+        Deduplicated list of valid, non-free-webmail email strings.
+    """
+    if not description:
+        return []
+
+    found: List[str] = []
+    seen: set = set()
+
+    for pattern in _DESCRIPTION_EMAIL_PATTERNS:
+        for match in pattern.finditer(description):
+            candidate = match.group(1).strip().lower()
+            if not _EMAIL_VALIDATE_RE.match(candidate):
+                continue
+            domain = candidate.split("@", 1)[1]
+            if domain in _FREE_WEBMAIL:
+                continue
+            if candidate not in seen:
+                seen.add(candidate)
+                found.append(candidate)
+
+    return found
+
+
 _CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "config", "skills_list.yaml"
 )
@@ -97,13 +217,36 @@ class JobCleanerPipeline:
             raw: Raw job field dict from an extractor.
 
         Returns:
-            Cleaned job dict with normalised fields.
+            Cleaned job dict with normalised fields, or None if title fails
+            garbage validation.
         """
         cleaned = dict(raw)
 
         # Text cleaning
-        cleaned["job_title"] = TextCleaner.clean_field(raw.get("job_title", ""))
+        title = TextCleaner.clean_field(raw.get("job_title", ""))
+        cleaned["job_title"] = title
+
+        # Task 1: Reject garbage titles (navigation labels, ALL_CAPS, too short)
+        if _is_garbage_title(title):
+            logger.debug(
+                "Job title rejected as garbage",
+                extra={"title": title, "job_url": raw.get("job_url", "")},
+            )
+            return None
+
         description = TextCleaner.clean_field(raw.get("description", ""))
+
+        # Task 2: Extract apply emails from description BEFORE stripping
+        raw_description_for_email = raw.get("description", "")
+        if not raw.get("apply_email"):
+            emails = extract_emails_from_description(raw_description_for_email)
+            if emails:
+                cleaned["apply_email"] = emails[0]
+                logger.debug(
+                    "Email extracted from description",
+                    extra={"email": emails[0], "title": title},
+                )
+
         cleaned["description"] = description
 
         # Location

@@ -2,12 +2,12 @@
 
 import csv
 import io
-import json
 import logging
-from typing import List, Optional
+from typing import List
 
 import httpx
 
+from scraper.config import config
 from scraper.sources.company_discovery.base import BaseCompanySource
 from scraper.sources.company_discovery.enrichment.domain_utils import (
     is_job_board,
@@ -17,7 +17,6 @@ from scraper.sources.company_discovery.enrichment.domain_utils import (
 logger = logging.getLogger(__name__)
 
 _HTTP_TIMEOUT = 30.0
-_RATE_LIMIT_KEY = "dataset_importer"
 
 # Public open-source company datasets (no authentication required)
 _GITHUB_CSV_SOURCES = [
@@ -37,10 +36,13 @@ _STARTUP_INDIA_API = (
 )
 _STARTUP_INDIA_PAGE_SIZE = 50
 
+# data.gov.in MSME UDYAM registered units — bulk open resource, no scraping.
+# Credentials and pagination limits are read from config (env vars).
+_DATAGOV_API_BASE = "https://api.data.gov.in/resource"
+
 # data.gov.in MCA21 resource ID (public, no auth required for open resources)
 _MCA21_API_BASE = "https://api.data.gov.in/resource"
 _MCA21_RESOURCE_ID = "64b1ecfd-8a52-40ab-954c-fc87f61f4e23"
-_MCA21_API_KEY = "579b464db66ec23bdd000001cdd3946e44ce4aad38d848d1d28c6edb"
 _MCA21_PAGE_SIZE = 500
 
 
@@ -80,6 +82,13 @@ class DatasetImporter(BaseCompanySource):
             extra={"domains": len(startup_india_domains)},
         )
         all_domains.extend(startup_india_domains)
+
+        msme_domains = await self._import_msme_udyam()
+        logger.info(
+            "MSME UDYAM bulk import complete",
+            extra={"domains": len(msme_domains)},
+        )
+        all_domains.extend(msme_domains)
 
         # Deduplicate at this stage before returning to the queue
         seen: set = set()
@@ -193,6 +202,106 @@ class DatasetImporter(BaseCompanySource):
                     )
                     break
 
+        return domains
+
+    async def _import_msme_udyam(self) -> List[str]:
+        """Import company website domains from the MSME UDYAM registered units
+        bulk dataset on data.gov.in.
+
+        Endpoint: GET /resource/{resource_id}?api-key=...&format=json&limit=...&offset=...
+        Resource: List of MSME Registered Units under UDYAM
+
+        Credentials and limits are read from config (DATAGOV_API_KEY,
+        DATAGOV_MSME_RESOURCE_ID, DATAGOV_MSME_MAX_PAGES, DATAGOV_PAGE_SIZE).
+
+        No scraping — pure paginated API download. No robots.txt concern.
+
+        Returns:
+            List of normalised apex domain strings.
+        """
+        api_key = config.datagov_api_key
+        resource_id = config.datagov_msme_resource_id
+        page_size = config.datagov_page_size
+        max_pages = config.datagov_msme_max_pages
+
+        if not api_key or not resource_id:
+            logger.warning(
+                "MSME UDYAM import skipped — DATAGOV_API_KEY or "
+                "DATAGOV_MSME_RESOURCE_ID not set in config"
+            )
+            return []
+
+        domains: List[str] = []
+        offset = 0
+
+        # Column name candidates for website/domain — the API field names
+        # can vary between dataset versions; check all known variants.
+        _WEBSITE_FIELDS = (
+            "website", "Website", "website_url", "WebsiteUrl",
+            "web", "url", "Url", "URL", "domain", "Domain",
+        )
+
+        async with httpx.AsyncClient(
+            timeout=_HTTP_TIMEOUT,
+            headers={"User-Agent": "JobHunterBot/1.0"},
+        ) as client:
+            for _ in range(max_pages):
+                params = {
+                    "api-key": api_key,
+                    "format": "json",
+                    "limit": page_size,
+                    "offset": offset,
+                }
+                try:
+                    resp = await client.get(
+                        f"{_DATAGOV_API_BASE}/{resource_id}",
+                        params=params,
+                    )
+                    if resp.status_code != 200:
+                        logger.debug(
+                            "MSME UDYAM API non-200",
+                            extra={"offset": offset, "status": resp.status_code},
+                        )
+                        break
+
+                    data = resp.json()
+                    records = data.get("records") or data.get("data") or []
+                    if not records:
+                        break
+
+                    for record in records:
+                        website = None
+                        for field in _WEBSITE_FIELDS:
+                            val = record.get(field, "")
+                            if val and isinstance(val, str) and val.strip():
+                                website = val.strip()
+                                break
+
+                        if not website:
+                            continue
+
+                        apex = normalize_apex_domain(website)
+                        if apex and not is_job_board(apex):
+                            domains.append(apex)
+
+                    # Stop if fewer records than requested — end of dataset
+                    if len(records) < page_size:
+                        break
+
+                    offset += page_size
+                    await self.rate_limiter.wait("msme_udyam")
+
+                except Exception as exc:
+                    logger.warning(
+                        "MSME UDYAM API error",
+                        extra={"offset": offset, "error": str(exc)},
+                    )
+                    break
+
+        logger.info(
+            "MSME UDYAM import complete",
+            extra={"domains_with_website": len(domains)},
+        )
         return domains
 
     async def _import_mca21(self) -> List[str]:

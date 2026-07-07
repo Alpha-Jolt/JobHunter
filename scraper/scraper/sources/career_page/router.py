@@ -107,6 +107,9 @@ class CareerPageRouter:
         for raw in resolved_jobs:
             try:
                 cleaned = self._cleaner.clean(raw)
+                if cleaned is None:
+                    # Title failed garbage validation — skip this job
+                    continue
                 enriched = self._enrich_with_metadata(cleaned, company)
                 cleaned_jobs.append(enriched)
             except Exception as exc:

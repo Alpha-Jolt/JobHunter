@@ -181,7 +181,7 @@ def _extract_location(address: object) -> Optional[str]:
     return ", ".join(parts) if parts else None
 
 
-def _clean_text(text: str) -> str:
+def _clean_text(text) -> str:
     """Strip and collapse whitespace in a metadata string.
 
     Args:
@@ -190,4 +190,8 @@ def _clean_text(text: str) -> str:
     Returns:
         Cleaned, stripped string.
     """
+    if isinstance(text, list):
+        text = ", ".join(str(x) for x in text if x)
+    elif not isinstance(text, str):
+        text = str(text)
     return re.sub(r"\s+", " ", text.strip())

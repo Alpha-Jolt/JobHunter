@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r orchestration_requirements.txt -r ai_engine_re
 
 COPY orchestration/ ./orchestration/
 COPY ai_engine/ ./ai_engine/
+COPY alembic.ini ./
 
 ENV PYTHONPATH=/app
 

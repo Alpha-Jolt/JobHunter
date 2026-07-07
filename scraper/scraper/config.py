@@ -61,6 +61,12 @@ class Config(BaseSettings):
     use_registry: bool = False
     registry_path: str = "registries/jobs.json"
 
+    # --- Company Discovery — data.gov.in open API -----
+    datagov_api_key: str = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"
+    datagov_msme_resource_id: str = "8b68ae56-84cf-4728-a0a6-1be11028dea7"
+    datagov_msme_max_pages: int = Field(default=100, ge=1, le=500)
+    datagov_page_size: int = Field(default=500, ge=1, le=1000)
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:
