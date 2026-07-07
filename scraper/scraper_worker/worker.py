@@ -104,6 +104,7 @@ async def _handle_company_discovery_bootstrap(
     from scraper.sources.company_discovery.bootstrap.vc_portfolio_crawler import VCPortfolioCrawler
     from scraper.sources.company_discovery.bootstrap.github_org_crawler import GitHubOrgCrawler
     from scraper.sources.company_discovery.bootstrap.directory_crawler import DirectoryCrawler
+    from scraper.sources.company_discovery.bootstrap.nasscom_crawler import NasscomDirectoryCrawler
 
     await r.set(status_key, json.dumps({"state": "running", "companies_found": 0, "error": None}))
 
@@ -134,6 +135,12 @@ async def _handle_company_discovery_bootstrap(
         if "all" in sources or "directory" in sources:
             dc = DirectoryCrawler(robots_checker=robots_checker, rate_limiter=rate_limiter, retry_handler=retry_handler)
             domains = await dc.discover()
+            all_domains.extend(domains)
+
+        if "all" in sources or "nasscom" in sources:
+            nasscom = NasscomDirectoryCrawler(rate_limiter=rate_limiter, retry_handler=retry_handler)
+            domains = await nasscom.discover()
+            logger.info(f"NASSCOM crawler returned {len(domains)} domains")
             all_domains.extend(domains)
 
         enriched_count = 0
@@ -523,14 +530,14 @@ async def _upsert_company(record: dict, session) -> None:
                     email_trust, ats_platform, industry, hq_location,
                     source, source_detail, robots_txt_allowed,
                     discovery_date, last_enriched_at, email_last_crawled_at,
-                    crawl_status, dedup_fingerprint
+                    crawl_status, dedup_fingerprint, is_generated
                 ) VALUES (
                     :company_id, :company_name, :normalized_name, :apex_domain,
                     :subdomains, :career_page_url, :career_emails, :contact_emails,
                     :email_trust, :ats_platform, :industry, :hq_location,
                     :source, :source_detail, :robots_txt_allowed,
                     :discovery_date, :last_enriched_at, :email_last_crawled_at,
-                    :crawl_status, :dedup_fingerprint
+                    :crawl_status, :dedup_fingerprint, :is_generated
                 )
                 ON CONFLICT (apex_domain) DO UPDATE SET
                     career_page_url = COALESCE(EXCLUDED.career_page_url, companies.career_page_url),
@@ -546,7 +553,13 @@ async def _upsert_company(record: dict, session) -> None:
                     END,
                     last_enriched_at = EXCLUDED.last_enriched_at,
                     email_last_crawled_at = EXCLUDED.email_last_crawled_at,
-                    crawl_status = EXCLUDED.crawl_status
+                    crawl_status = EXCLUDED.crawl_status,
+                    is_generated = companies.is_generated OR EXCLUDED.is_generated,
+                    email_trust = CASE
+                        WHEN EXCLUDED.is_generated = true AND companies.email_trust = 'unverified'
+                            THEN 'low_trust'
+                        ELSE companies.email_trust
+                    END
             """),
             {
                 "company_id": str(record.get("company_id") or _uuid.uuid4()),
@@ -569,6 +582,7 @@ async def _upsert_company(record: dict, session) -> None:
                 "email_last_crawled_at": record.get("email_last_crawled_at"),
                 "crawl_status": record.get("crawl_status", "enriched"),
                 "dedup_fingerprint": record.get("dedup_fingerprint", ""),
+                "is_generated": record.get("is_generated", False),
             },
         )
         await session.commit()

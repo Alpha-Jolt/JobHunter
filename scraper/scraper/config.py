@@ -67,6 +67,9 @@ class Config(BaseSettings):
     datagov_msme_max_pages: int = Field(default=100, ge=1, le=500)
     datagov_page_size: int = Field(default=500, ge=1, le=1000)
 
+    # --- Candidate email generation (post-enrichment) ---
+    candidate_email_mx_timeout: float = Field(default=5.0, gt=0, le=30)
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

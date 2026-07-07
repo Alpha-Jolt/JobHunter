@@ -291,6 +291,7 @@ class Company(Base):
     email_last_crawled_at = Column(DateTime(timezone=True), nullable=True)
     crawl_status = Column(String(20), nullable=False, default="pending")
     dedup_fingerprint = Column(String(64), nullable=False)
+    is_generated = Column(Boolean, nullable=False, default=False)
     related_company_id = Column(
         UUID(as_uuid=True),
         ForeignKey("companies.company_id", ondelete="SET NULL"),

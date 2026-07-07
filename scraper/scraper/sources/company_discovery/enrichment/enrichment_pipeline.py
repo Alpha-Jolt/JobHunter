@@ -26,6 +26,9 @@ from scraper.sources.company_discovery.enrichment.metadata_extractor import (
 from scraper.sources.company_discovery.enrichment.robots_checker import (
     RobotsChecker,
 )
+from scraper.sources.company_discovery.enrichment.candidate_email_generator import (
+    CandidateEmailGenerator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,7 @@ class EnrichmentPipeline:
         self._robots_checker = robots_checker or RobotsChecker()
         self._email_extractor = email_extractor or EmailExtractor()
         self._metadata_extractor = metadata_extractor or MetadataExtractor()
+        self._candidate_generator = CandidateEmailGenerator()
         self._known_domains: Set[str] = known_domains if known_domains is not None else set()
 
     async def enrich(
@@ -120,6 +124,7 @@ class EnrichmentPipeline:
                 "career_emails": [],
                 "contact_emails": [],
                 "email_trust": "unverified",
+                "is_generated": False,
                 "ats_platform": "none",
             }
 
@@ -131,14 +136,32 @@ class EnrichmentPipeline:
         career_emails: list = email_data.get("career_emails", [])
         contact_emails: list = email_data.get("contact_emails", [])
 
+        # Step 5b — Candidate email generation (post-enrichment fallback)
+        # Only runs when scraping found nothing. Skipped for robots-blocked
+        # domains since those are handled before reaching this point.
+        is_generated = False
+        if not career_emails and not contact_emails:
+            candidates = await self._candidate_generator.generate(apex_domain)
+            if candidates:
+                career_emails = candidates
+                is_generated = True
+                logger.info(
+                    "Candidate emails generated for domain",
+                    extra={"domain": apex_domain, "count": len(candidates)},
+                )
+
         # Determine overall email_trust
         all_emails = career_emails + contact_emails
         from scraper.sources.company_discovery.enrichment.email_classifier import classify_email
-        has_low_trust = any(
-            (result := classify_email(e)) and result[1] == "low_trust"
-            for e in all_emails
-        )
-        email_trust = "low_trust" if has_low_trust else "unverified"
+        if is_generated:
+            # Generated emails are always low_trust regardless of prefix
+            email_trust = "low_trust"
+        else:
+            has_low_trust = any(
+                (result := classify_email(e)) and result[1] == "low_trust"
+                for e in all_emails
+            )
+            email_trust = "low_trust" if has_low_trust else "unverified"
 
         # Step 6 — ATS detection (requires career page HTML)
         ats_platform = "none"
@@ -165,6 +188,7 @@ class EnrichmentPipeline:
             "career_emails": career_emails,
             "contact_emails": contact_emails,
             "email_trust": email_trust,
+            "is_generated": is_generated,
             "ats_platform": ats_platform,
             "industry": industry,
             "hq_location": hq_location,
