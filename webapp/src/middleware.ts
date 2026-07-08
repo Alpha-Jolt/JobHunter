@@ -8,6 +8,7 @@ export function middleware(request: NextRequest) {
   // Allow public paths and Next.js internals
   if (
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    pathname.startsWith("/u/") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname === "/manifest.json" ||

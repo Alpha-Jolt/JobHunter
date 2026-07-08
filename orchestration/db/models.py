@@ -390,3 +390,147 @@ class CareerJob(Base):
     )
 
     company = relationship("Company", back_populates="career_jobs")
+
+
+# ── User Profile models ───────────────────────────────────────────────────────
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
+    username = Column(String(50), unique=True, nullable=False)
+    headline = Column(String(255))
+    bio = Column(Text)
+    location = Column(String(255))
+    website_url = Column(Text)
+    avatar_key = Column(Text)
+    is_public = Column(Boolean, nullable=False, default=False)
+    public_slug = Column(String(50))
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = relationship("User", backref="profile")
+    experiences = relationship("UserExperience", back_populates="profile", cascade="all, delete-orphan", order_by="UserExperience.order_index")
+    education = relationship("UserEducation", back_populates="profile", cascade="all, delete-orphan", order_by="UserEducation.order_index")
+    projects = relationship("UserProject", back_populates="profile", cascade="all, delete-orphan", order_by="UserProject.order_index")
+    certifications = relationship("UserCertification", back_populates="profile", cascade="all, delete-orphan", order_by="UserCertification.order_index")
+    skills = relationship("UserSkill", back_populates="profile", cascade="all, delete-orphan", order_by="UserSkill.order_index")
+    languages = relationship("UserLanguage", back_populates="profile", cascade="all, delete-orphan", order_by="UserLanguage.order_index")
+    achievements = relationship("UserAchievement", back_populates="profile", cascade="all, delete-orphan", order_by="UserAchievement.order_index")
+    social_links = relationship("UserSocialLink", back_populates="profile", cascade="all, delete-orphan", order_by="UserSocialLink.order_index")
+
+
+class UserExperience(Base):
+    __tablename__ = "user_experience"
+
+    exp_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    company = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
+    start_date = Column(DateTime(timezone=True))
+    end_date = Column(DateTime(timezone=True))
+    is_current = Column(Boolean, nullable=False, default=False)
+    description = Column(Text)
+    location = Column(String(255))
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="experiences")
+
+
+class UserEducation(Base):
+    __tablename__ = "user_education"
+
+    edu_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    institution = Column(String(255), nullable=False)
+    degree = Column(String(255))
+    field = Column(String(255))
+    start_year = Column(Integer)
+    end_year = Column(Integer)
+    grade = Column(String(50))
+    description = Column(Text)
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="education")
+
+
+class UserProject(Base):
+    __tablename__ = "user_projects"
+
+    proj_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    url = Column(Text)
+    repo_url = Column(Text)
+    skills = Column(ARRAY(Text), nullable=False, default=list)
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="projects")
+
+
+class UserCertification(Base):
+    __tablename__ = "user_certifications"
+
+    cert_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    issuer = Column(String(255))
+    issued_date = Column(DateTime(timezone=True))
+    expiry_date = Column(DateTime(timezone=True))
+    credential_url = Column(Text)
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="certifications")
+
+
+class UserSkill(Base):
+    __tablename__ = "user_skills"
+
+    skill_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    category = Column(String(50))
+    proficiency = Column(String(50))
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="skills")
+
+
+class UserLanguage(Base):
+    __tablename__ = "user_languages"
+
+    lang_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    proficiency = Column(String(50))
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="languages")
+
+
+class UserAchievement(Base):
+    __tablename__ = "user_achievements"
+
+    ach_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    date = Column(DateTime(timezone=True))
+    url = Column(Text)
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="achievements")
+
+
+class UserSocialLink(Base):
+    __tablename__ = "user_social_links"
+
+    link_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user_profiles.user_id", ondelete="CASCADE"), nullable=False)
+    platform = Column(String(50), nullable=False)
+    url = Column(Text, nullable=False)
+    order_index = Column(Integer, nullable=False, default=0)
+
+    profile = relationship("UserProfile", back_populates="social_links")
+

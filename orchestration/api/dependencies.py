@@ -88,6 +88,13 @@ async def get_scraper_runs_repo(session: AsyncSession = Depends(get_db_session))
     return PostgresScraperRunsRepository(session)
 
 
+async def get_profile_repo(session: AsyncSession = Depends(get_db_session)):
+    from orchestration.repositories.postgres_profile_repository import (
+        PostgresProfileRepository,
+    )
+    return PostgresProfileRepository(session)
+
+
 async def get_mail_service(
     settings: Settings = Depends(get_settings),
     job_registry: PostgresJobRepository = Depends(get_job_registry),

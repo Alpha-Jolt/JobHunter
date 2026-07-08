@@ -167,3 +167,100 @@ export interface DashboardMetrics {
     last_status: string;
   };
 }
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+export interface ExperienceEntry {
+  exp_id: string;
+  company: string;
+  title: string;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  description: string | null;
+  location: string | null;
+  order_index: number;
+}
+
+export interface EducationEntry {
+  edu_id: string;
+  institution: string;
+  degree: string | null;
+  field: string | null;
+  start_year: number | null;
+  end_year: number | null;
+  grade: string | null;
+  description: string | null;
+  order_index: number;
+}
+
+export interface ProjectEntry {
+  proj_id: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  repo_url: string | null;
+  skills: string[];
+  order_index: number;
+}
+
+export interface CertificationEntry {
+  cert_id: string;
+  name: string;
+  issuer: string | null;
+  issued_date: string | null;
+  expiry_date: string | null;
+  credential_url: string | null;
+  order_index: number;
+}
+
+export interface SkillEntry {
+  skill_id: string;
+  name: string;
+  category: string | null;
+  proficiency: string | null;
+  order_index: number;
+}
+
+export interface LanguageEntry {
+  lang_id: string;
+  name: string;
+  proficiency: string | null;
+  order_index: number;
+}
+
+export interface AchievementEntry {
+  ach_id: string;
+  title: string;
+  description: string | null;
+  date: string | null;
+  url: string | null;
+  order_index: number;
+}
+
+export interface SocialLinkEntry {
+  link_id: string;
+  platform: string;
+  url: string;
+  order_index: number;
+}
+
+export interface UserProfile {
+  user_id: string;
+  username: string;
+  headline: string | null;
+  bio: string | null;
+  location: string | null;
+  website_url: string | null;
+  avatar_url: string | null;
+  is_public: boolean;
+  public_slug: string | null;
+  experiences: ExperienceEntry[];
+  education: EducationEntry[];
+  projects: ProjectEntry[];
+  certifications: CertificationEntry[];
+  skills: SkillEntry[];
+  languages: LanguageEntry[];
+  achievements: AchievementEntry[];
+  social_links: SocialLinkEntry[];
+}

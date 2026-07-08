@@ -26,6 +26,7 @@ from orchestration.api.routes.health import router as health_router
 from orchestration.auth.routes.auth import router as auth_router
 from orchestration.api.routes.career_jobs import router as career_jobs_router
 from orchestration.api.routes.resume import router as resume_router
+from orchestration.api.routes.profile import router as profile_router
 from orchestration.auth.middleware import JWTLoggingMiddleware
 from orchestration.core.logging_setup import setup_logging
 from orchestration.db.connection import dispose_engine, init_engine
@@ -68,12 +69,34 @@ async def on_startup() -> None:
         pool_size=settings.database.db_pool_size,
         max_overflow=settings.database.db_max_overflow,
     )
-    from orchestration.db.connection import _engine
-    from orchestration.db.models import Base
+    from orchestration.db.connection import _engine, get_session_factory
+    from orchestration.db.models import Base, UserProfile
+    from sqlalchemy import select
+    import redis.asyncio as redis
+    
     instrument_sqlalchemy(_engine)
     if not settings.database.use_alembic_migrations:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            
+    # Seed Bloom filter
+    try:
+        redis_client = redis.Redis.from_url(settings.redis.redis_url, decode_responses=True)
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            stmt = select(UserProfile.username)
+            result = await session.execute(stmt)
+            usernames = result.scalars().all()
+            if usernames:
+                await redis_client.execute_command("BF.MADD", "jh:bf:usernames", *usernames)
+    except Exception as e:
+        logger.warning(f"Failed to seed Bloom filter on startup: {e}")
+    finally:
+        try:
+            await redis_client.aclose()
+        except:
+            pass
+
     os.makedirs("logs", exist_ok=True)
     logger.info("JobHunter Orchestration API started")
 
@@ -97,6 +120,7 @@ async def root() -> JSONResponse:
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(resume_router, prefix="/api/resume", tags=["resume"])
+app.include_router(profile_router, prefix="/api/profile", tags=["profile"])
 app.include_router(scraper_router.router, prefix="/api", tags=["scraper"])
 app.include_router(ai_router, prefix="/api/ai", tags=["ai"])
 app.include_router(mail_router)

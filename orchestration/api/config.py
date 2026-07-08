@@ -99,6 +99,7 @@ class MinIOConfig(BaseSettings):
     minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
+    minio_avatar_bucket: str = Field(default="jobhunter-avatars", alias="MINIO_AVATAR_BUCKET_NAME")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
 
 class RedisConfig(BaseSettings):

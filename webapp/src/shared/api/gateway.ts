@@ -15,6 +15,15 @@ import type {
   SentTodayResponse,
   DashboardMetrics,
   PreviewResumeResponse,
+  UserProfile,
+  ExperienceEntry,
+  EducationEntry,
+  ProjectEntry,
+  SkillEntry,
+  CertificationEntry,
+  LanguageEntry,
+  AchievementEntry,
+  SocialLinkEntry,
 } from "./types";
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -120,4 +129,38 @@ export const applicationsApi = {
 export const dashboardApi = {
   metrics: () =>
     client.get<DashboardMetrics>("/api/admin/dashboard/metrics").then((r) => r.data),
+};
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+export const profileApi = {
+  getMe: () => client.get<UserProfile>("/api/profile/me").then((r) => r.data),
+  updateMe: (data: Partial<UserProfile>) => client.put<UserProfile>("/api/profile/me", data).then((r) => r.data),
+  uploadAvatar: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return client.post<{ avatar_url: string }>("/api/profile/me/avatar", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+  deleteAvatar: () => client.delete<{ status: string }>("/api/profile/me/avatar").then((r) => r.data),
+  getPublicProfile: (username: string) => client.get<UserProfile>(`/api/profile/u/${username}`).then((r) => r.data),
+  
+  addExperience: (data: Omit<ExperienceEntry, "exp_id">) => client.post<{ exp_id: string }>("/api/profile/me/experience", data).then((r) => r.data),
+  updateExperience: (id: string, data: Partial<ExperienceEntry>) => client.put<{ status: string }>(`/api/profile/me/experience/${id}`, data).then((r) => r.data),
+  deleteExperience: (id: string) => client.delete<{ status: string }>(`/api/profile/me/experience/${id}`).then((r) => r.data),
+  
+  addEducation: (data: Omit<EducationEntry, "edu_id">) => client.post<{ edu_id: string }>("/api/profile/me/education", data).then((r) => r.data),
+  updateEducation: (id: string, data: Partial<EducationEntry>) => client.put<{ status: string }>(`/api/profile/me/education/${id}`, data).then((r) => r.data),
+  deleteEducation: (id: string) => client.delete<{ status: string }>(`/api/profile/me/education/${id}`).then((r) => r.data),
+  
+  addProject: (data: Omit<ProjectEntry, "proj_id">) => client.post<{ proj_id: string }>("/api/profile/me/projects", data).then((r) => r.data),
+  updateProject: (id: string, data: Partial<ProjectEntry>) => client.put<{ status: string }>(`/api/profile/me/projects/${id}`, data).then((r) => r.data),
+  deleteProject: (id: string) => client.delete<{ status: string }>(`/api/profile/me/projects/${id}`).then((r) => r.data),
+  
+  replaceSkills: (data: Omit<SkillEntry, "skill_id">[]) => client.put<{ status: string }>("/api/profile/me/skills", data).then((r) => r.data),
+  replaceCertifications: (data: Omit<CertificationEntry, "cert_id">[]) => client.put<{ status: string }>("/api/profile/me/certifications", data).then((r) => r.data),
+  replaceLanguages: (data: Omit<LanguageEntry, "lang_id">[]) => client.put<{ status: string }>("/api/profile/me/languages", data).then((r) => r.data),
+  replaceAchievements: (data: Omit<AchievementEntry, "ach_id">[]) => client.put<{ status: string }>("/api/profile/me/achievements", data).then((r) => r.data),
+  replaceSocialLinks: (data: Omit<SocialLinkEntry, "link_id">[]) => client.put<{ status: string }>("/api/profile/me/social-links", data).then((r) => r.data),
 };
