@@ -133,11 +133,15 @@ def require_role(*roles: RoleEnum):
     """
     async def _check(user: UserRecord = Depends(get_current_user)) -> UserRecord:
         from orchestration.core.spans import traced
-        async with traced("RBAC", required_roles=[r.value for r in roles], user_role=user.role.value):
-            if user.role not in roles:
+        
+        allowed_roles = [r.value if hasattr(r, 'value') else r for r in roles]
+        current_role = user.role.value if hasattr(user.role, 'value') else user.role
+        
+        async with traced("RBAC", required_roles=allowed_roles, user_role=current_role):
+            if current_role not in allowed_roles:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Role '{user.role.value}' is not authorized for this action",
+                    detail=f"Role '{current_role}' is not authorized for this action",
                 )
             return user
 

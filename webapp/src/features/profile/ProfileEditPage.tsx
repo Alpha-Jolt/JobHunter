@@ -3,9 +3,18 @@
 import { useEffect } from "react";
 import { Loader2, ExternalLink } from "lucide-react";
 import { profileApi } from "@/shared/api/gateway";
+import { ApiError } from "@/shared/api/errors";
 import { useProfileStore } from "@/shared/state/profileStore";
 import { useUiStore } from "@/shared/state/uiStore";
 import { ProfileHeader } from "./ProfileHeader";
+import { ExperienceSection } from "./ExperienceSection";
+import { EducationSection } from "./EducationSection";
+import { SkillsSection } from "./SkillsSection";
+import { ProjectsSection } from "./ProjectsSection";
+import { CertificationsSection } from "./CertificationsSection";
+import { LanguagesSection } from "./LanguagesSection";
+import { AchievementsSection } from "./AchievementsSection";
+import { SocialLinksSection } from "./SocialLinksSection";
 import { Button } from "@/shared/components/Button";
 
 export function ProfileEditPage() {
@@ -18,8 +27,9 @@ export function ProfileEditPage() {
       try {
         const data = await profileApi.getMe();
         setProfile(data);
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
+      } catch (err: unknown) {
+        const status = err instanceof ApiError ? err.status : 0;
+        if (status === 404) {
           // Lazy init: leave profile as empty (null). The first save will create it.
           setProfile({
             user_id: "",
@@ -76,9 +86,16 @@ export function ProfileEditPage() {
 
       <ProfileHeader profile={profile} />
       
-      {/* Placeholders for other sections to save boilerplate generation */}
-      <div className="bg-card border border-border rounded-lg shadow-sm p-6 text-center text-muted-foreground">
-        Experience, Education, Skills, and other sections will go here.
+      {/* Profile Sections */}
+      <div className="space-y-6">
+        <ExperienceSection experiences={profile.experiences} />
+        <EducationSection education={profile.education} />
+        <SkillsSection skills={profile.skills} />
+        <ProjectsSection projects={profile.projects} />
+        <CertificationsSection certifications={profile.certifications} />
+        <LanguagesSection languages={profile.languages} />
+        <AchievementsSection achievements={profile.achievements} />
+        <SocialLinksSection socialLinks={profile.social_links} />
       </div>
     </div>
   );

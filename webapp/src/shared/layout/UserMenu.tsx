@@ -40,9 +40,12 @@ export function UserMenu() {
         <Button variant="ghost" size="icon" aria-label="User menu">
           <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center overflow-hidden">
             {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              </>
             ) : (
-              initials
+            initials
             )}
           </span>
         </Button>

@@ -8,6 +8,7 @@ export function PublicProfileView({ profile }: { profile: UserProfile }) {
       <section className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
         {profile.avatar_url ? (
           <div className="h-40 w-40 rounded-full overflow-hidden border-4 border-background shadow-lg shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={profile.avatar_url} alt={profile.username} className="h-full w-full object-cover" />
           </div>
         ) : (

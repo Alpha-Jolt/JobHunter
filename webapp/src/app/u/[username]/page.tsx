@@ -19,7 +19,7 @@ export default async function PublicProfilePage({ params }: PageProps) {
   const { username } = await params;
   try {
     const res = await fetch(`${config.apiBaseUrl}/api/profile/u/${username}`, {
-      next: { revalidate: 60 },
+      next: { revalidate: 60, tags: [`profile-${username}`] },
     });
     
     if (!res.ok) {

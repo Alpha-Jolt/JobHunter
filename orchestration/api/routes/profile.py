@@ -6,9 +6,9 @@ from pydantic import BaseModel, HttpUrl
 from uuid import UUID
 import magic
 
-from orchestration.api.dependencies import get_profile_repo, get_internal_s3_client
+from orchestration.api.dependencies import get_profile_repo, get_internal_s3_client, get_external_s3_client
 from orchestration.auth.dependencies import get_current_user, require_role
-from orchestration.db.models import User, user_role
+from orchestration.db.models import User
 from orchestration.api.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -200,7 +200,7 @@ async def get_my_profile(
     user: User = Depends(require_role("hunter")),
     repo = Depends(get_profile_repo),
     settings = Depends(get_settings),
-    s3_client = Depends(get_internal_s3_client)
+    s3_client = Depends(get_external_s3_client)
 ):
     profile = await repo.get_profile(user.user_id)
     if not profile:
@@ -214,10 +214,10 @@ async def update_my_profile(
     user: User = Depends(require_role("hunter")),
     repo = Depends(get_profile_repo),
     settings = Depends(get_settings),
-    s3_client = Depends(get_internal_s3_client)
+    s3_client = Depends(get_external_s3_client)
 ):
     try:
-        profile = await repo.upsert_profile(user.user_id, data.model_dump(exclude_unset=True))
+        profile = await repo.upsert_profile(user.user_id, data.model_dump(exclude_unset=True), user_email=user.email)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
@@ -231,7 +231,8 @@ async def upload_avatar(
     user: User = Depends(require_role("hunter")),
     repo = Depends(get_profile_repo),
     settings = Depends(get_settings),
-    s3_client = Depends(get_internal_s3_client)
+    internal_s3 = Depends(get_internal_s3_client),
+    external_s3 = Depends(get_external_s3_client)
 ):
     content = await file.read()
     if len(content) > 5 * 1024 * 1024:
@@ -245,7 +246,7 @@ async def upload_avatar(
     object_key = f"{user.user_id}/avatar_{uuid.uuid4().hex[:8]}.{ext}"
     
     try:
-        s3_client.put_object(
+        internal_s3.put_object(
             Bucket=settings.minio.minio_avatar_bucket,
             Key=object_key,
             Body=content,
@@ -256,9 +257,9 @@ async def upload_avatar(
         raise HTTPException(status_code=500, detail="Failed to upload avatar")
 
     # Update DB
-    await repo.upsert_profile(user.user_id, {"avatar_key": object_key})
+    await repo.upsert_profile(user.user_id, {"avatar_key": object_key}, user_email=user.email)
     
-    return {"avatar_url": _get_avatar_url(s3_client, settings.minio.minio_avatar_bucket, object_key)}
+    return {"avatar_url": _get_avatar_url(external_s3, settings.minio.minio_avatar_bucket, object_key)}
 
 @router.delete("/me/avatar")
 async def delete_avatar(
@@ -277,7 +278,7 @@ async def delete_avatar(
         except Exception as e:
             logger.warning(f"S3 delete failed: {e}")
         
-        await repo.upsert_profile(user.user_id, {"avatar_key": None})
+        await repo.upsert_profile(user.user_id, {"avatar_key": None}, user_email=user.email)
     return {"status": "ok"}
 
 
@@ -286,7 +287,7 @@ async def get_public_profile(
     username: str,
     repo = Depends(get_profile_repo),
     settings = Depends(get_settings),
-    s3_client = Depends(get_internal_s3_client)
+    s3_client = Depends(get_external_s3_client)
 ):
     profile = await repo.get_public_profile(username)
     if not profile:

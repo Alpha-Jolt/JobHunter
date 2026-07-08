@@ -38,7 +38,7 @@ export function ProfileHeader({ profile }: { profile: UserProfile }) {
       const res = await profileApi.uploadAvatar(file);
       updateSection({ avatar_url: res.avatar_url });
       addToast("success", "Avatar updated successfully");
-    } catch (err) {
+    } catch {
       addToast("error", "Failed to upload avatar");
     } finally {
       setIsUploading(false);
@@ -51,7 +51,7 @@ export function ProfileHeader({ profile }: { profile: UserProfile }) {
       const updated = await profileApi.updateMe(formData);
       updateSection(updated);
       addToast("success", "Profile overview saved");
-    } catch (err) {
+    } catch {
       addToast("error", "Failed to save profile");
     } finally {
       setIsSaving(false);
@@ -64,7 +64,10 @@ export function ProfileHeader({ profile }: { profile: UserProfile }) {
         <div className="flex flex-col items-center gap-4">
           <div className="relative h-32 w-32 rounded-full overflow-hidden bg-muted border-4 border-background shadow-sm">
             {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+              </>
             ) : (
               <div className="h-full w-full flex items-center justify-center text-muted-foreground bg-secondary">
                 No Avatar

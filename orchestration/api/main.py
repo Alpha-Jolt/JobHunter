@@ -79,6 +79,18 @@ async def on_startup() -> None:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
             
+    # Init Minio buckets
+    try:
+        from orchestration.api.dependencies import get_internal_s3_client
+        s3 = get_internal_s3_client(settings)
+        try:
+            s3.head_bucket(Bucket=settings.minio.minio_avatar_bucket)
+        except Exception:
+            s3.create_bucket(Bucket=settings.minio.minio_avatar_bucket)
+            logger.info(f"Created Minio bucket: {settings.minio.minio_avatar_bucket}")
+    except Exception as e:
+        logger.warning(f"Failed to init Minio bucket: {e}")
+
     # Seed Bloom filter
     try:
         redis_client = redis.Redis.from_url(settings.redis.redis_url, decode_responses=True)

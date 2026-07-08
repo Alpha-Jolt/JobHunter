@@ -95,18 +95,26 @@ class PostgresProfileRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none() is None
 
-    async def upsert_profile(self, user_id: UUID, data: dict) -> UserProfile:
+    async def upsert_profile(self, user_id: UUID, data: dict, user_email: Optional[str] = None) -> UserProfile:
         """Upsert core profile identity data."""
-        # Ensure username availability if provided
         new_username = data.get("username")
-        if new_username:
-            is_available = await self.check_username_available(new_username, exclude_user_id=user_id)
-            if not is_available:
-                raise ValueError("Username is already taken")
 
         stmt = select(UserProfile).where(UserProfile.user_id == user_id)
         result = await self.session.execute(stmt)
         profile = result.scalar_one_or_none()
+
+        if not new_username and profile is None and user_email:
+            import re
+            import secrets
+            base = re.sub(r"[^a-z0-9]", "_", user_email.split("@")[0].lower())[:20]
+            suffix = secrets.token_hex(2)
+            new_username = f"{base}_{suffix}"
+            data["username"] = new_username
+
+        if new_username:
+            is_available = await self.check_username_available(new_username, exclude_user_id=user_id)
+            if not is_available:
+                raise ValueError("Username is already taken")
 
         if profile:
             for key, value in data.items():
