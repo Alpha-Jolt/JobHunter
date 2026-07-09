@@ -13,8 +13,8 @@ from botocore.exceptions import ClientError
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from orchestration.auth.dependencies import require_role
-from orchestration.auth.models.user import RoleEnum
+from orchestration.auth.dependencies import get_current_user, require_role
+from orchestration.auth.models.user import RoleEnum, UserRecord
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -324,6 +324,39 @@ async def preview_variant(
         gaps=details["gaps"],
         match_score=float(details.get("match_score", 0)),
     )
+
+
+@router.get(
+    "/variant/{variant_id}/token",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def get_variant_approval_token(
+    variant_id: str,
+    current_user: UserRecord = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Return the approval token for a variant the authenticated user owns."""
+    try:
+        variant_uuid = uuid.UUID(variant_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid variant_id")
+
+    from orchestration.repositories.postgres_variant_repository import PostgresVariantRepository
+    variant_repo = PostgresVariantRepository(session)
+    try:
+        variant = await variant_repo.get(variant_uuid)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    # Ownership check — user can only fetch their own variant's token
+    if str(variant.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    if not variant.approval_token:
+        raise HTTPException(status_code=404, detail="Approval token not found")
+
+    return {"approval_token": variant.approval_token}
 
 
 @router.post(

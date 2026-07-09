@@ -29,7 +29,7 @@ class OpenAIProvider(LLMProvider):
         try:
             from openai import AsyncOpenAI  # type: ignore # noqa: PLC0415
 
-            self._client = AsyncOpenAI(api_key=api_key)
+            self._client = AsyncOpenAI(api_key=api_key, max_retries=0)
         except ImportError as exc:
             raise ProviderError(
                 "openai package not installed. Run: pip install openai",

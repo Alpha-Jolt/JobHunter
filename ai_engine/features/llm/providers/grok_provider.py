@@ -9,6 +9,7 @@ from typing import Any
 from ai_engine.core.exceptions import (
     ProviderAuthError,
     ProviderError,
+    ProviderQuotaError,
     ProviderRateLimitError,
     SchemaValidationError,
 )
@@ -29,7 +30,7 @@ class GrokProvider(LLMProvider):
         try:
             from openai import AsyncOpenAI  # type: ignore # noqa: PLC0415
 
-            self._client = AsyncOpenAI(api_key=api_key, base_url=_BASE_URL)
+            self._client = AsyncOpenAI(api_key=api_key, base_url=_BASE_URL, max_retries=0)
         except ImportError as exc:
             raise ProviderError(
                 "openai package not installed. Run: pip install openai",
@@ -103,6 +104,11 @@ class GrokProvider(LLMProvider):
                         raise ProviderRateLimitError(self.provider_name) from exc
                 elif exc.status_code == 401:
                     raise ProviderAuthError(self.provider_name) from exc
+                elif exc.status_code == 402:
+                    # TODO: Trigger a notification/alert to the user/admin that this provider
+                    # has insufficient balance and requires a top-up before it can be used.
+                    # Notification implementation is pending (e.g. email, dashboard alert, Slack).
+                    raise ProviderQuotaError(self.provider_name) from exc
                 else:
                     if attempt == max_retries - 1:
                         raise ProviderError(str(exc), provider=self.provider_name) from exc

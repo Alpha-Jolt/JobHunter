@@ -7,7 +7,9 @@ import time
 from typing import Any
 
 from ai_engine.core.exceptions import (
+    ProviderAuthError,
     ProviderError,
+    ProviderQuotaError,
     ProviderRateLimitError,
     SchemaValidationError,
 )
@@ -21,6 +23,32 @@ logger = get_logger(__name__)
 # Exponential backoff base delay in seconds
 _BACKOFF_BASE = 2.0
 _BACKOFF_MAX = 30.0
+
+
+# Hard cap: connection errors won't block more than this per provider
+PROVIDER_TIMEOUT_SECONDS = 60.0
+
+# Maps ProviderType → LLMSettings attribute name for the API key
+_KEY_ATTR: dict[ProviderType, str] = {
+    ProviderType.ANTHROPIC: "anthropic_api_key",
+    ProviderType.OPENAI: "openai_api_key",
+    ProviderType.GEMINI: "gemini_api_key",
+    ProviderType.DEEPSEEK: "deepseek_api_key",
+    ProviderType.GROK: "grok_api_key",
+    ProviderType.OPENROUTER: "openrouter_api_key",
+}
+
+
+def _has_api_key(provider_type: ProviderType, settings: Any) -> bool:
+    """Return True if the provider has a non-empty API key configured."""
+    attr = _KEY_ATTR.get(provider_type)
+    if not attr:
+        return True
+    key = getattr(settings, attr, None)
+    if key is None:
+        return False
+    val = key.get_secret_value() if hasattr(key, "get_secret_value") else str(key)
+    return bool(val.strip())
 
 
 def _build_provider(provider_type: ProviderType, settings: Any) -> LLMProvider:
@@ -114,6 +142,14 @@ class LLMRouter:
         last_error: Exception | None = None
 
         for idx, provider_type in enumerate(self._provider_chain):
+            if not _has_api_key(provider_type, self._settings):
+                logger.info(
+                    "llm_router.skipped",
+                    provider=provider_type.value,
+                    reason="empty_api_key",
+                )
+                continue
+
             provider = _build_provider(provider_type, self._settings)
             logger.info(
                 "llm_router.attempting",
@@ -124,10 +160,13 @@ class LLMRouter:
 
             try:
                 start = time.monotonic()
-                result = await provider.complete(
-                    prompt=prompt,
-                    output_schema=output_schema,
-                    max_retries=self._settings.max_retries,
+                result = await asyncio.wait_for(
+                    provider.complete(
+                        prompt=prompt,
+                        output_schema=output_schema,
+                        max_retries=self._settings.max_retries,
+                    ),
+                    timeout=PROVIDER_TIMEOUT_SECONDS,
                 )
                 result.prompt_version = prompt_version
                 elapsed = time.monotonic() - start
@@ -152,6 +191,31 @@ class LLMRouter:
                     latency_seconds=round(elapsed, 3),
                 )
                 return result
+
+            except asyncio.TimeoutError:
+                last_error = Exception(f"Provider {provider.provider_name} timed out after {PROVIDER_TIMEOUT_SECONDS}s")
+                logger.warning(
+                    "llm_router.provider_timeout",
+                    provider=provider.provider_name,
+                    timeout_seconds=PROVIDER_TIMEOUT_SECONDS,
+                )
+                metrics.increment(f"llm.timeout.{provider.provider_name}")
+                continue
+
+            except (ProviderAuthError, ProviderQuotaError) as exc:
+                last_error = exc
+                logger.warning(
+                    "llm_router.provider_skipped",
+                    provider=provider.provider_name,
+                    reason=exc.category,  # "auth" or "quota"
+                    next_provider=(
+                        self._provider_chain[idx + 1].value
+                        if idx + 1 < len(self._provider_chain)
+                        else None
+                    ),
+                )
+                metrics.increment(f"llm.skip.{provider.provider_name}")
+                continue
 
             except ProviderRateLimitError as exc:
                 last_error = exc

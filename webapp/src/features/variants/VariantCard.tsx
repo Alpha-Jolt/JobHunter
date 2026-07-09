@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle2, XCircle, Eye } from "lucide-react";
 import { variantsApi } from "@/shared/api/gateway";
-import { getVariantToken, clearVariantToken, useVariantStore } from "@/shared/state/variantStore";
+import { useVariantStore } from "@/shared/state/variantStore";
 import { useUiStore } from "@/shared/state/uiStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/Card";
 import { Button } from "@/shared/components/Button";
@@ -38,15 +38,11 @@ export function VariantCard({ variant }: VariantCardProps) {
   };
 
   const handleApprove = async () => {
-    const token = getVariantToken(variant.variant_id);
-    if (!token) {
-      addToast("error", "Approval token not found. Please regenerate this variant.");
-      return;
-    }
     setIsApproving(true);
     try {
-      await variantsApi.approve(variant.variant_id, token);
-      clearVariantToken(variant.variant_id);
+      // Fetch token from server on demand — never stored persistently
+      const { approval_token } = await variantsApi.getToken(variant.variant_id);
+      await variantsApi.approve(variant.variant_id, approval_token);
       removeVariant(variant.variant_id);
       addToast("success", "Variant approved. You can now send the application.");
     } catch (err: unknown) {
@@ -61,7 +57,6 @@ export function VariantCard({ variant }: VariantCardProps) {
     setIsRejecting(true);
     try {
       await variantsApi.reject(variant.variant_id);
-      clearVariantToken(variant.variant_id);
       removeVariant(variant.variant_id);
       addToast("info", "Variant rejected.");
     } catch {
@@ -87,11 +82,11 @@ export function VariantCard({ variant }: VariantCardProps) {
           <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
             <div
               className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.round(variant.match_score * 100)}%` }}
+              style={{ width: `${Math.min(Math.round(variant.match_score), 100)}%` }}
             />
           </div>
           <span className="text-xs font-medium text-muted-foreground w-10 text-right">
-            {Math.round(variant.match_score * 100)}%
+            {Math.round(variant.match_score)}%
           </span>
         </div>
 
@@ -112,12 +107,7 @@ export function VariantCard({ variant }: VariantCardProps) {
           </div>
         )}
 
-        {/* Token availability indicator — no token value exposed */}
-        {!getVariantToken(variant.variant_id) && (
-          <p className="text-xs text-warning mb-2 text-yellow-600 dark:text-yellow-400">
-            ⚠ Approval token unavailable. Regenerate this variant to approve.
-          </p>
-        )}
+        {/* Preview panel */}
 
         <div className="flex gap-2 flex-wrap">
           <Button
@@ -133,7 +123,6 @@ export function VariantCard({ variant }: VariantCardProps) {
             size="sm"
             onClick={handleApprove}
             isLoading={isApproving}
-            disabled={!getVariantToken(variant.variant_id)}
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             Approve

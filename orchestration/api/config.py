@@ -58,7 +58,7 @@ class ServicePaths(BaseSettings):
 class LLMConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    llm_primary_provider: str = Field(default="anthropic", alias="LLM_PRIMARY_PROVIDER")
+    llm_primary_provider: str = Field(default="openrouter", alias="LLM_PRIMARY_PROVIDER")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
 
@@ -67,7 +67,7 @@ class MailConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     sendgrid_api_key: Optional[str] = Field(default=None, alias="SENDGRID_API_KEY")
-    mail_sender_email: str = Field(default="apply@jobhunter.app", alias="MAIL_SENDER_EMAIL")
+    mail_sender_email: str = Field(default="apply@myjobhunter.in", alias="MAIL_SENDER_EMAIL")
     mail_bridge_url: str = Field(default="http://localhost:3000", alias="MAIL_BRIDGE_URL")
     mail_bridge_api_key: str = Field(default="", alias="MAIL_BRIDGE_API_KEY")
 

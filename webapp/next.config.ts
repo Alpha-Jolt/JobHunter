@@ -1,23 +1,27 @@
 import type { NextConfig } from "next";
 
+const minioUrl = process.env.NEXT_PUBLIC_MINIO_URL ?? "http://localhost:9000";
+const parsedMinioUrl = new URL(minioUrl);
+const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const internalApiUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   images: {
     remotePatterns: [
       {
-        protocol: "http",
-        hostname: "localhost",
-        port: "9000",
+        protocol: parsedMinioUrl.protocol.replace(":", "") as "http" | "https",
+        hostname: parsedMinioUrl.hostname,
+        port: parsedMinioUrl.port,
       },
     ],
   },
 
   async rewrites() {
-    const apiUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
     return [
       {
         source: "/api/:path*",
-        destination: `${apiUrl}/api/:path*`,
+        destination: `${internalApiUrl}/api/:path*`,
       },
     ];
   },
@@ -40,9 +44,9 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              `img-src 'self' data: blob: ${minioUrl}`,
               "font-src 'self'",
-              "connect-src 'self' http://localhost:8000",
+              `connect-src 'self' ${apiUrl}`,
             ].join("; "),
           },
         ],

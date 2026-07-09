@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { variantsApi } from "@/shared/api/gateway";
-import { useVariantStore, saveVariantToken } from "@/shared/state/variantStore";
+import { useVariantStore } from "@/shared/state/variantStore";
 import { useAuthStore } from "@/shared/state/authStore";
 import { useUiStore } from "@/shared/state/uiStore";
 
@@ -30,8 +30,7 @@ export function useVariants() {
       setLoading(true);
       try {
         const data = await variantsApi.generate(user.user_id, jobId, resumeKey);
-        // Securely store token in sessionStorage immediately after generation
-        saveVariantToken(data.variant_id, data.approval_token);
+        // Token is fetched securely on demand, no sessionStorage storage required.
         addToast("success", `Variant generated for ${data.job_title}. Review and approve it.`);
         await fetchPending();
         return true;
