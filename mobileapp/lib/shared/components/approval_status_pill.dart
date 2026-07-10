@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import 'app_button.dart';
 
 /// Approval status indicator — first-class component expressing the
 /// no-fabrication guarantee visually.

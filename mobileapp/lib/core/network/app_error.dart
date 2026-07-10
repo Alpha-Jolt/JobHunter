@@ -66,10 +66,13 @@ class AppError implements Exception {
           technicalDetail: body,
         );
       case 409:
+        // Business-rule conflicts — calm, expected-state treatment.
+        // The backend body distinguishes sub-types; map them explicitly.
+        final conflictMessage = _mapConflictBody(body);
         return AppError(
           type: AppErrorType.conflict,
           statusCode: statusCode,
-          userMessage: body ?? 'This action conflicts with the current state.',
+          userMessage: conflictMessage,
           technicalDetail: body,
         );
       case 429:
@@ -115,4 +118,24 @@ class AppError implements Exception {
   @override
   String toString() => 'AppError(type: $type, status: $statusCode, '
       'message: $userMessage)';
+}
+
+/// Maps a 409 conflict response body to a specific, calm user-facing message.
+/// Business-rule conflicts are expected states — never shown as failures.
+String _mapConflictBody(String? body) {
+  if (body == null) return 'This action conflicts with the current state.';
+  final lower = body.toLowerCase();
+  if (lower.contains('already applied') || lower.contains('duplicate application')) {
+    return "You've already applied to this job.";
+  }
+  if (lower.contains('daily limit') || lower.contains('limit exceeded')) {
+    return "You've reached today's application limit (10). Come back tomorrow.";
+  }
+  if (lower.contains('already approved') || lower.contains('token') && lower.contains('used')) {
+    return 'This variant has already been processed.';
+  }
+  if (lower.contains('duplicate variant') || lower.contains('already exists')) {
+    return 'You already have a variant for this job.';
+  }
+  return body;
 }

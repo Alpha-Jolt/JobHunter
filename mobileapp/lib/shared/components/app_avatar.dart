@@ -27,11 +27,11 @@ class AppAvatar extends StatelessWidget {
             width: radius * 2,
             height: radius * 2,
             fit: BoxFit.cover,
-            placeholder: (_, __) => _Initials(
+            placeholder: (_, _) => _Initials(
               initials: initials,
               radius: radius,
             ),
-            errorWidget: (_, __, ___) => _Initials(
+            errorWidget: (_, _, _) => _Initials(
               initials: initials,
               radius: radius,
             ),

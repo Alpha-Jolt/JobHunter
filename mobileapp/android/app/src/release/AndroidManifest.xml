@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release-only manifest overlay.
+  Adds usesCleartextTraffic="false" so cleartext HTTP is blocked in production.
+  In debug builds this overlay is not merged — localhost HTTP remains accessible
+  for the dev API server (via network_security_config.xml domain exception).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:usesCleartextTraffic="false" />
+</manifest>

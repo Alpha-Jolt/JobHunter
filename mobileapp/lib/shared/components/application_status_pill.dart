@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
 import 'app_badge.dart';
 
 /// Application status pill mapping backend enum values.
