@@ -28,6 +28,11 @@ class JobListScreen extends ConsumerWidget {
         title: const Text('Jobs'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.swipe_outlined),
+            tooltip: 'Swipe to select',
+            onPressed: () => context.push('/jobs/swipe'),
+          ),
+          IconButton(
             icon: Stack(
               children: [
                 const Icon(Icons.filter_list_outlined),
@@ -335,6 +340,29 @@ class _FilterSheetState extends State<_FilterSheet> {
               ),
             ),
           ),
+          const SizedBox(height: AppSpacing.xl2),
+
+          // Experience range
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Experience', style: theme.textTheme.titleSmall),
+              Text(
+                '${_experienceRange.start.round()} – '
+                '${_experienceRange.end.round() == 15 ? '15+' : _experienceRange.end.round()} yrs',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          RangeSlider(
+            values: _experienceRange,
+            min: 0,
+            max: 15,
+            divisions: 15,
+            onChanged: (v) => setState(() => _experienceRange = v),
+          ),
           const SizedBox(height: AppSpacing.xl3),
 
           // Actions
@@ -348,6 +376,12 @@ class _FilterSheetState extends State<_FilterSheet> {
                 location: _locationCtrl.text.trim().isEmpty
                     ? null
                     : _locationCtrl.text.trim(),
+                experienceMin: _experienceRange.start.round() == 0
+                    ? null
+                    : _experienceRange.start.round(),
+                experienceMax: _experienceRange.end.round() == 15
+                    ? null
+                    : _experienceRange.end.round(),
               ),
             ),
           ),

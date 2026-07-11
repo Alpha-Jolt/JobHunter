@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,34 +20,29 @@ class ResumeUploadScreen extends ConsumerStatefulWidget {
 
 class _ResumeUploadScreenState extends ConsumerState<ResumeUploadScreen>
     with SecureScreenMixin {
-  PlatformFile? _pickedFile;
+  XFile? _pickedFile;
+  int _fileSize = 0;
   String? _validationError;
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'docx'],
-      withData: true,
+    const typeGroup = XTypeGroup(
+      label: 'Documents',
+      extensions: ['pdf', 'docx'],
     );
-    if (result == null || result.files.isEmpty) return;
+    final file = await openFile(acceptedTypeGroups: [typeGroup]);
+    if (file == null) return;
 
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || file.path == null) {
-      setState(() => _validationError = 'Could not read the selected file.');
-      return;
-    }
+    final bytes = await file.readAsBytes();
+    final size = bytes.length;
+    final name = file.name;
 
-    final error = FileUtils.validateResume(
-      file.name,
-      file.size,
-      bytes,
-    );
+    final error = FileUtils.validateResume(name, size, bytes);
 
     setState(() {
       _validationError = error;
       if (error == null) {
         _pickedFile = file;
+        _fileSize = size;
         ref.read(resumeUploadProvider.notifier).reset();
       }
     });
@@ -55,11 +50,11 @@ class _ResumeUploadScreenState extends ConsumerState<ResumeUploadScreen>
 
   Future<void> _upload() async {
     final file = _pickedFile;
-    if (file == null || file.path == null) return;
+    if (file == null) return;
 
     await ref
         .read(resumeUploadProvider.notifier)
-        .upload(file.path!, file.name);
+        .upload(file.path, file.name);
 
     final state = ref.read(resumeUploadProvider);
     if (state.status == ResumeUploadStatus.success && mounted) {
@@ -144,7 +139,7 @@ class _ResumeUploadScreenState extends ConsumerState<ResumeUploadScreen>
                       if (_pickedFile != null) ...[
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          '${(_pickedFile!.size / 1024).toStringAsFixed(1)} KB',
+                          '${(_fileSize / 1024).toStringAsFixed(1)} KB',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

@@ -2209,7 +2209,7 @@ as String,
 /// @nodoc
 mixin _$UserProfile {
 
-@JsonKey(name: 'user_id') String get userId; String? get username; String? get headline; String? get bio; String? get location;@JsonKey(name: 'avatar_key') String? get avatarKey;@JsonKey(name: 'avatar_url') String? get avatarUrl;@JsonKey(name: 'is_public') bool get isPublic; List<UserExperience> get experiences; List<UserEducation> get education; List<UserProject> get projects; List<UserSkill> get skills; List<UserCertification> get certifications; List<UserLanguage> get languages; List<UserAchievement> get achievements;@JsonKey(name: 'social_links') List<UserSocialLink> get socialLinks;
+@JsonKey(name: 'user_id') String get userId; String? get username; String? get headline; String? get bio; String? get location;@JsonKey(name: 'avatar_key') String? get avatarKey;@JsonKey(name: 'avatar_url') String? get avatarUrl;@JsonKey(name: 'is_public') bool get isPublic; List<UserExperience> get experiences; List<UserEducation> get education; List<UserProject> get projects; List<UserSkill> get skills; List<UserCertification> get certifications; List<UserLanguage> get languages; List<UserAchievement> get achievements;@JsonKey(name: 'social_links') List<UserSocialLink> get socialLinks;@JsonKey(name: 'master_resume') MasterResume? get masterResume;
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2222,16 +2222,16 @@ $UserProfileCopyWith<UserProfile> get copyWith => _$UserProfileCopyWithImpl<User
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.headline, headline) || other.headline == headline)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.location, location) || other.location == location)&&(identical(other.avatarKey, avatarKey) || other.avatarKey == avatarKey)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.isPublic, isPublic) || other.isPublic == isPublic)&&const DeepCollectionEquality().equals(other.experiences, experiences)&&const DeepCollectionEquality().equals(other.education, education)&&const DeepCollectionEquality().equals(other.projects, projects)&&const DeepCollectionEquality().equals(other.skills, skills)&&const DeepCollectionEquality().equals(other.certifications, certifications)&&const DeepCollectionEquality().equals(other.languages, languages)&&const DeepCollectionEquality().equals(other.achievements, achievements)&&const DeepCollectionEquality().equals(other.socialLinks, socialLinks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserProfile&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.headline, headline) || other.headline == headline)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.location, location) || other.location == location)&&(identical(other.avatarKey, avatarKey) || other.avatarKey == avatarKey)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.isPublic, isPublic) || other.isPublic == isPublic)&&const DeepCollectionEquality().equals(other.experiences, experiences)&&const DeepCollectionEquality().equals(other.education, education)&&const DeepCollectionEquality().equals(other.projects, projects)&&const DeepCollectionEquality().equals(other.skills, skills)&&const DeepCollectionEquality().equals(other.certifications, certifications)&&const DeepCollectionEquality().equals(other.languages, languages)&&const DeepCollectionEquality().equals(other.achievements, achievements)&&const DeepCollectionEquality().equals(other.socialLinks, socialLinks)&&(identical(other.masterResume, masterResume) || other.masterResume == masterResume));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,userId,username,headline,bio,location,avatarKey,avatarUrl,isPublic,const DeepCollectionEquality().hash(experiences),const DeepCollectionEquality().hash(education),const DeepCollectionEquality().hash(projects),const DeepCollectionEquality().hash(skills),const DeepCollectionEquality().hash(certifications),const DeepCollectionEquality().hash(languages),const DeepCollectionEquality().hash(achievements),const DeepCollectionEquality().hash(socialLinks));
+int get hashCode => Object.hash(runtimeType,userId,username,headline,bio,location,avatarKey,avatarUrl,isPublic,const DeepCollectionEquality().hash(experiences),const DeepCollectionEquality().hash(education),const DeepCollectionEquality().hash(projects),const DeepCollectionEquality().hash(skills),const DeepCollectionEquality().hash(certifications),const DeepCollectionEquality().hash(languages),const DeepCollectionEquality().hash(achievements),const DeepCollectionEquality().hash(socialLinks),masterResume);
 
 @override
 String toString() {
-  return 'UserProfile(userId: $userId, username: $username, headline: $headline, bio: $bio, location: $location, avatarKey: $avatarKey, avatarUrl: $avatarUrl, isPublic: $isPublic, experiences: $experiences, education: $education, projects: $projects, skills: $skills, certifications: $certifications, languages: $languages, achievements: $achievements, socialLinks: $socialLinks)';
+  return 'UserProfile(userId: $userId, username: $username, headline: $headline, bio: $bio, location: $location, avatarKey: $avatarKey, avatarUrl: $avatarUrl, isPublic: $isPublic, experiences: $experiences, education: $education, projects: $projects, skills: $skills, certifications: $certifications, languages: $languages, achievements: $achievements, socialLinks: $socialLinks, masterResume: $masterResume)';
 }
 
 
@@ -2242,11 +2242,11 @@ abstract mixin class $UserProfileCopyWith<$Res>  {
   factory $UserProfileCopyWith(UserProfile value, $Res Function(UserProfile) _then) = _$UserProfileCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'user_id') String userId, String? username, String? headline, String? bio, String? location,@JsonKey(name: 'avatar_key') String? avatarKey,@JsonKey(name: 'avatar_url') String? avatarUrl,@JsonKey(name: 'is_public') bool isPublic, List<UserExperience> experiences, List<UserEducation> education, List<UserProject> projects, List<UserSkill> skills, List<UserCertification> certifications, List<UserLanguage> languages, List<UserAchievement> achievements,@JsonKey(name: 'social_links') List<UserSocialLink> socialLinks
+@JsonKey(name: 'user_id') String userId, String? username, String? headline, String? bio, String? location,@JsonKey(name: 'avatar_key') String? avatarKey,@JsonKey(name: 'avatar_url') String? avatarUrl,@JsonKey(name: 'is_public') bool isPublic, List<UserExperience> experiences, List<UserEducation> education, List<UserProject> projects, List<UserSkill> skills, List<UserCertification> certifications, List<UserLanguage> languages, List<UserAchievement> achievements,@JsonKey(name: 'social_links') List<UserSocialLink> socialLinks,@JsonKey(name: 'master_resume') MasterResume? masterResume
 });
 
 
-
+$MasterResumeCopyWith<$Res>? get masterResume;
 
 }
 /// @nodoc
@@ -2259,7 +2259,7 @@ class _$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? username = freezed,Object? headline = freezed,Object? bio = freezed,Object? location = freezed,Object? avatarKey = freezed,Object? avatarUrl = freezed,Object? isPublic = null,Object? experiences = null,Object? education = null,Object? projects = null,Object? skills = null,Object? certifications = null,Object? languages = null,Object? achievements = null,Object? socialLinks = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? username = freezed,Object? headline = freezed,Object? bio = freezed,Object? location = freezed,Object? avatarKey = freezed,Object? avatarUrl = freezed,Object? isPublic = null,Object? experiences = null,Object? education = null,Object? projects = null,Object? skills = null,Object? certifications = null,Object? languages = null,Object? achievements = null,Object? socialLinks = null,Object? masterResume = freezed,}) {
   return _then(_self.copyWith(
 userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
@@ -2277,10 +2277,23 @@ as List<UserSkill>,certifications: null == certifications ? _self.certifications
 as List<UserCertification>,languages: null == languages ? _self.languages : languages // ignore: cast_nullable_to_non_nullable
 as List<UserLanguage>,achievements: null == achievements ? _self.achievements : achievements // ignore: cast_nullable_to_non_nullable
 as List<UserAchievement>,socialLinks: null == socialLinks ? _self.socialLinks : socialLinks // ignore: cast_nullable_to_non_nullable
-as List<UserSocialLink>,
+as List<UserSocialLink>,masterResume: freezed == masterResume ? _self.masterResume : masterResume // ignore: cast_nullable_to_non_nullable
+as MasterResume?,
   ));
 }
+/// Create a copy of UserProfile
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$MasterResumeCopyWith<$Res>? get masterResume {
+    if (_self.masterResume == null) {
+    return null;
+  }
 
+  return $MasterResumeCopyWith<$Res>(_self.masterResume!, (value) {
+    return _then(_self.copyWith(masterResume: value));
+  });
+}
 }
 
 
@@ -2362,10 +2375,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks, @JsonKey(name: 'master_resume')  MasterResume? masterResume)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks);case _:
+return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks,_that.masterResume);case _:
   return orElse();
 
 }
@@ -2383,10 +2396,10 @@ return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.locat
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks, @JsonKey(name: 'master_resume')  MasterResume? masterResume)  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile():
-return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks);case _:
+return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks,_that.masterResume);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -2403,10 +2416,10 @@ return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.locat
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String? username,  String? headline,  String? bio,  String? location, @JsonKey(name: 'avatar_key')  String? avatarKey, @JsonKey(name: 'avatar_url')  String? avatarUrl, @JsonKey(name: 'is_public')  bool isPublic,  List<UserExperience> experiences,  List<UserEducation> education,  List<UserProject> projects,  List<UserSkill> skills,  List<UserCertification> certifications,  List<UserLanguage> languages,  List<UserAchievement> achievements, @JsonKey(name: 'social_links')  List<UserSocialLink> socialLinks, @JsonKey(name: 'master_resume')  MasterResume? masterResume)?  $default,) {final _that = this;
 switch (_that) {
 case _UserProfile() when $default != null:
-return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks);case _:
+return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.location,_that.avatarKey,_that.avatarUrl,_that.isPublic,_that.experiences,_that.education,_that.projects,_that.skills,_that.certifications,_that.languages,_that.achievements,_that.socialLinks,_that.masterResume);case _:
   return null;
 
 }
@@ -2418,7 +2431,7 @@ return $default(_that.userId,_that.username,_that.headline,_that.bio,_that.locat
 @JsonSerializable()
 
 class _UserProfile implements UserProfile {
-  const _UserProfile({@JsonKey(name: 'user_id') required this.userId, this.username, this.headline, this.bio, this.location, @JsonKey(name: 'avatar_key') this.avatarKey, @JsonKey(name: 'avatar_url') this.avatarUrl, @JsonKey(name: 'is_public') this.isPublic = false, final  List<UserExperience> experiences = const [], final  List<UserEducation> education = const [], final  List<UserProject> projects = const [], final  List<UserSkill> skills = const [], final  List<UserCertification> certifications = const [], final  List<UserLanguage> languages = const [], final  List<UserAchievement> achievements = const [], @JsonKey(name: 'social_links') final  List<UserSocialLink> socialLinks = const []}): _experiences = experiences,_education = education,_projects = projects,_skills = skills,_certifications = certifications,_languages = languages,_achievements = achievements,_socialLinks = socialLinks;
+  const _UserProfile({@JsonKey(name: 'user_id') required this.userId, this.username, this.headline, this.bio, this.location, @JsonKey(name: 'avatar_key') this.avatarKey, @JsonKey(name: 'avatar_url') this.avatarUrl, @JsonKey(name: 'is_public') this.isPublic = false, final  List<UserExperience> experiences = const [], final  List<UserEducation> education = const [], final  List<UserProject> projects = const [], final  List<UserSkill> skills = const [], final  List<UserCertification> certifications = const [], final  List<UserLanguage> languages = const [], final  List<UserAchievement> achievements = const [], @JsonKey(name: 'social_links') final  List<UserSocialLink> socialLinks = const [], @JsonKey(name: 'master_resume') this.masterResume}): _experiences = experiences,_education = education,_projects = projects,_skills = skills,_certifications = certifications,_languages = languages,_achievements = achievements,_socialLinks = socialLinks;
   factory _UserProfile.fromJson(Map<String, dynamic> json) => _$UserProfileFromJson(json);
 
 @override@JsonKey(name: 'user_id') final  String userId;
@@ -2485,6 +2498,7 @@ class _UserProfile implements UserProfile {
   return EqualUnmodifiableListView(_socialLinks);
 }
 
+@override@JsonKey(name: 'master_resume') final  MasterResume? masterResume;
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
@@ -2499,16 +2513,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.headline, headline) || other.headline == headline)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.location, location) || other.location == location)&&(identical(other.avatarKey, avatarKey) || other.avatarKey == avatarKey)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.isPublic, isPublic) || other.isPublic == isPublic)&&const DeepCollectionEquality().equals(other._experiences, _experiences)&&const DeepCollectionEquality().equals(other._education, _education)&&const DeepCollectionEquality().equals(other._projects, _projects)&&const DeepCollectionEquality().equals(other._skills, _skills)&&const DeepCollectionEquality().equals(other._certifications, _certifications)&&const DeepCollectionEquality().equals(other._languages, _languages)&&const DeepCollectionEquality().equals(other._achievements, _achievements)&&const DeepCollectionEquality().equals(other._socialLinks, _socialLinks));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserProfile&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.username, username) || other.username == username)&&(identical(other.headline, headline) || other.headline == headline)&&(identical(other.bio, bio) || other.bio == bio)&&(identical(other.location, location) || other.location == location)&&(identical(other.avatarKey, avatarKey) || other.avatarKey == avatarKey)&&(identical(other.avatarUrl, avatarUrl) || other.avatarUrl == avatarUrl)&&(identical(other.isPublic, isPublic) || other.isPublic == isPublic)&&const DeepCollectionEquality().equals(other._experiences, _experiences)&&const DeepCollectionEquality().equals(other._education, _education)&&const DeepCollectionEquality().equals(other._projects, _projects)&&const DeepCollectionEquality().equals(other._skills, _skills)&&const DeepCollectionEquality().equals(other._certifications, _certifications)&&const DeepCollectionEquality().equals(other._languages, _languages)&&const DeepCollectionEquality().equals(other._achievements, _achievements)&&const DeepCollectionEquality().equals(other._socialLinks, _socialLinks)&&(identical(other.masterResume, masterResume) || other.masterResume == masterResume));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,userId,username,headline,bio,location,avatarKey,avatarUrl,isPublic,const DeepCollectionEquality().hash(_experiences),const DeepCollectionEquality().hash(_education),const DeepCollectionEquality().hash(_projects),const DeepCollectionEquality().hash(_skills),const DeepCollectionEquality().hash(_certifications),const DeepCollectionEquality().hash(_languages),const DeepCollectionEquality().hash(_achievements),const DeepCollectionEquality().hash(_socialLinks));
+int get hashCode => Object.hash(runtimeType,userId,username,headline,bio,location,avatarKey,avatarUrl,isPublic,const DeepCollectionEquality().hash(_experiences),const DeepCollectionEquality().hash(_education),const DeepCollectionEquality().hash(_projects),const DeepCollectionEquality().hash(_skills),const DeepCollectionEquality().hash(_certifications),const DeepCollectionEquality().hash(_languages),const DeepCollectionEquality().hash(_achievements),const DeepCollectionEquality().hash(_socialLinks),masterResume);
 
 @override
 String toString() {
-  return 'UserProfile(userId: $userId, username: $username, headline: $headline, bio: $bio, location: $location, avatarKey: $avatarKey, avatarUrl: $avatarUrl, isPublic: $isPublic, experiences: $experiences, education: $education, projects: $projects, skills: $skills, certifications: $certifications, languages: $languages, achievements: $achievements, socialLinks: $socialLinks)';
+  return 'UserProfile(userId: $userId, username: $username, headline: $headline, bio: $bio, location: $location, avatarKey: $avatarKey, avatarUrl: $avatarUrl, isPublic: $isPublic, experiences: $experiences, education: $education, projects: $projects, skills: $skills, certifications: $certifications, languages: $languages, achievements: $achievements, socialLinks: $socialLinks, masterResume: $masterResume)';
 }
 
 
@@ -2519,11 +2533,11 @@ abstract mixin class _$UserProfileCopyWith<$Res> implements $UserProfileCopyWith
   factory _$UserProfileCopyWith(_UserProfile value, $Res Function(_UserProfile) _then) = __$UserProfileCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'user_id') String userId, String? username, String? headline, String? bio, String? location,@JsonKey(name: 'avatar_key') String? avatarKey,@JsonKey(name: 'avatar_url') String? avatarUrl,@JsonKey(name: 'is_public') bool isPublic, List<UserExperience> experiences, List<UserEducation> education, List<UserProject> projects, List<UserSkill> skills, List<UserCertification> certifications, List<UserLanguage> languages, List<UserAchievement> achievements,@JsonKey(name: 'social_links') List<UserSocialLink> socialLinks
+@JsonKey(name: 'user_id') String userId, String? username, String? headline, String? bio, String? location,@JsonKey(name: 'avatar_key') String? avatarKey,@JsonKey(name: 'avatar_url') String? avatarUrl,@JsonKey(name: 'is_public') bool isPublic, List<UserExperience> experiences, List<UserEducation> education, List<UserProject> projects, List<UserSkill> skills, List<UserCertification> certifications, List<UserLanguage> languages, List<UserAchievement> achievements,@JsonKey(name: 'social_links') List<UserSocialLink> socialLinks,@JsonKey(name: 'master_resume') MasterResume? masterResume
 });
 
 
-
+@override $MasterResumeCopyWith<$Res>? get masterResume;
 
 }
 /// @nodoc
@@ -2536,7 +2550,7 @@ class __$UserProfileCopyWithImpl<$Res>
 
 /// Create a copy of UserProfile
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? username = freezed,Object? headline = freezed,Object? bio = freezed,Object? location = freezed,Object? avatarKey = freezed,Object? avatarUrl = freezed,Object? isPublic = null,Object? experiences = null,Object? education = null,Object? projects = null,Object? skills = null,Object? certifications = null,Object? languages = null,Object? achievements = null,Object? socialLinks = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? username = freezed,Object? headline = freezed,Object? bio = freezed,Object? location = freezed,Object? avatarKey = freezed,Object? avatarUrl = freezed,Object? isPublic = null,Object? experiences = null,Object? education = null,Object? projects = null,Object? skills = null,Object? certifications = null,Object? languages = null,Object? achievements = null,Object? socialLinks = null,Object? masterResume = freezed,}) {
   return _then(_UserProfile(
 userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
 as String,username: freezed == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
@@ -2554,11 +2568,24 @@ as List<UserSkill>,certifications: null == certifications ? _self._certification
 as List<UserCertification>,languages: null == languages ? _self._languages : languages // ignore: cast_nullable_to_non_nullable
 as List<UserLanguage>,achievements: null == achievements ? _self._achievements : achievements // ignore: cast_nullable_to_non_nullable
 as List<UserAchievement>,socialLinks: null == socialLinks ? _self._socialLinks : socialLinks // ignore: cast_nullable_to_non_nullable
-as List<UserSocialLink>,
+as List<UserSocialLink>,masterResume: freezed == masterResume ? _self.masterResume : masterResume // ignore: cast_nullable_to_non_nullable
+as MasterResume?,
   ));
 }
 
+/// Create a copy of UserProfile
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$MasterResumeCopyWith<$Res>? get masterResume {
+    if (_self.masterResume == null) {
+    return null;
+  }
 
+  return $MasterResumeCopyWith<$Res>(_self.masterResume!, (value) {
+    return _then(_self.copyWith(masterResume: value));
+  });
+}
 }
 
 

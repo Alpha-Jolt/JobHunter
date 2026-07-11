@@ -4,13 +4,13 @@ import 'package:jobhunter/core/network/app_error.dart';
 import 'package:jobhunter/shared/components/error_banner.dart';
 
 void main() {
-  Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+  Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
   group('ErrorBanner — standard error', () {
     testWidgets('shows message text', (tester) async {
       // Arrange + Act
       await tester.pumpWidget(
-        _wrap(const ErrorBanner(message: 'Something went wrong.')),
+        wrap(const ErrorBanner(message: 'Something went wrong.')),
       );
 
       // Assert
@@ -24,7 +24,7 @@ void main() {
 
       // Act
       await tester.pumpWidget(
-        _wrap(ErrorBanner(
+        wrap(ErrorBanner(
           message: 'Error',
           isRetryable: true,
           onRetry: () => retried = true,
@@ -40,7 +40,7 @@ void main() {
     testWidgets('hides Retry button when isRetryable is false', (tester) async {
       // Arrange + Act
       await tester.pumpWidget(
-        _wrap(const ErrorBanner(message: 'Error', isRetryable: false)),
+        wrap(const ErrorBanner(message: 'Error', isRetryable: false)),
       );
 
       // Assert
@@ -55,7 +55,7 @@ void main() {
 
       // Act
       await tester.pumpWidget(
-        _wrap(ErrorBanner.fromError(error)),
+        wrap(ErrorBanner.fromError(error)),
       );
 
       // Assert
@@ -71,7 +71,7 @@ void main() {
 
       // Act
       await tester.pumpWidget(
-        _wrap(ErrorBanner.fromError(error)),
+        wrap(ErrorBanner.fromError(error)),
       );
 
       // Assert

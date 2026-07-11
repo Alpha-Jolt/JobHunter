@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 
 import 'package:jobhunter/core/network/dio_client.dart';
 import 'package:jobhunter/core/network/app_error.dart';
-import 'package:jobhunter/features/variants/data/variant_models.dart';
 import 'package:jobhunter/features/variants/data/variant_repository.dart';
 
 import 'variant_repository_test.mocks.dart';

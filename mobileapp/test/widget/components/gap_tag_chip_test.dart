@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jobhunter/shared/components/gap_tag_chip.dart';
 
 void main() {
-  Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
+  Widget wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
   group('GapTagChip — no-fabrication guarantee', () {
     testWidgets('always contains "not in your resume" label text',
         (tester) async {
       // Arrange + Act
-      await tester.pumpWidget(_wrap(const GapTagChip(gap: 'Kubernetes')));
+      await tester.pumpWidget(wrap(const GapTagChip(gap: 'Kubernetes')));
 
       // Assert — gap must NEVER be presented as a present skill
       final text = tester.widget<Text>(find.byType(Text).last);
@@ -21,7 +21,7 @@ void main() {
 
     testWidgets('displays the gap skill name', (tester) async {
       // Arrange + Act
-      await tester.pumpWidget(_wrap(const GapTagChip(gap: 'Docker')));
+      await tester.pumpWidget(wrap(const GapTagChip(gap: 'Docker')));
 
       // Assert
       expect(find.textContaining('Docker'), findsOneWidget);
@@ -30,7 +30,7 @@ void main() {
     testWidgets('never shows a green check icon (must not imply skill present)',
         (tester) async {
       // Arrange + Act
-      await tester.pumpWidget(_wrap(const GapTagChip(gap: 'Python')));
+      await tester.pumpWidget(wrap(const GapTagChip(gap: 'Python')));
 
       // Assert — no check icons that could imply skill is present
       expect(find.byIcon(Icons.check), findsNothing);

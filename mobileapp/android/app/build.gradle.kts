@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "in.myjobhunter.jobhunter"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

@@ -8,6 +8,7 @@ abstract class RouteNames {
   static const String home = 'home';
   static const String jobs = 'jobs';
   static const String jobDetail = 'job-detail';
+  static const String jobSwipe = 'job-swipe';
   static const String variantGeneration = 'variant-generation';
   static const String variants = 'variants';
   static const String variantDetail = 'variant-detail';

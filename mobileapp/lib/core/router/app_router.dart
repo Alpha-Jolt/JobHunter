@@ -8,6 +8,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/signup_screen.dart';
 import '../../features/dashboard/screens/home_screen.dart';
 import '../../features/jobs/screens/job_list_screen.dart';
+import '../../features/jobs/screens/job_swipe_screen.dart';
 import '../../features/jobs/screens/job_detail_screen.dart';
 import '../../features/variants/screens/variant_list_screen.dart';
 import '../../features/variants/screens/variant_detail_screen.dart';
@@ -98,6 +99,11 @@ GoRouter appRouter(Ref ref) {
             name: RouteNames.jobs,
             builder: (context, state) => const JobListScreen(),
             routes: [
+              GoRoute(
+                path: 'swipe',
+                name: RouteNames.jobSwipe,
+                builder: (context, state) => const JobSwipeScreen(),
+              ),
               GoRoute(
                 path: ':jobId',
                 name: RouteNames.jobDetail,

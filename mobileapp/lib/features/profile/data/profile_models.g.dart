@@ -185,6 +185,9 @@ _UserProfile _$UserProfileFromJson(Map<String, dynamic> json) => _UserProfile(
           ?.map((e) => UserSocialLink.fromJson(e as Map<String, dynamic>))
           .toList() ??
       const [],
+  masterResume: json['master_resume'] == null
+      ? null
+      : MasterResume.fromJson(json['master_resume'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$UserProfileToJson(_UserProfile instance) =>
@@ -205,6 +208,7 @@ Map<String, dynamic> _$UserProfileToJson(_UserProfile instance) =>
       'languages': instance.languages,
       'achievements': instance.achievements,
       'social_links': instance.socialLinks,
+      'master_resume': instance.masterResume,
     };
 
 _ProfileUpsertRequest _$ProfileUpsertRequestFromJson(

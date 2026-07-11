@@ -103,8 +103,8 @@ Future<bool> _confirmDelete(BuildContext context, String item) async {
 // Experience section
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ExperienceSection extends ConsumerWidget {
-  const _ExperienceSection({required this.profile});
+class ExperienceSection extends ConsumerWidget {
+  const ExperienceSection({required this.profile, super.key});
   final UserProfile profile;
 
   @override
@@ -142,7 +142,7 @@ class _ExperienceSection extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _ExperienceSheet(existing: existing, ref: ref),
+      builder: (context) => _ExperienceSheet(existing: existing, ref: ref),
     );
   }
 }
@@ -283,8 +283,8 @@ class _ExperienceSheetState extends State<_ExperienceSheet> {
 // Education section
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _EducationSection extends ConsumerWidget {
-  const _EducationSection({required this.profile});
+class EducationSection extends ConsumerWidget {
+  const EducationSection({required this.profile, super.key});
   final UserProfile profile;
 
   @override
@@ -320,7 +320,7 @@ class _EducationSection extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _EducationSheet(existing: existing, ref: ref),
+      builder: (context) => _EducationSheet(existing: existing, ref: ref),
     );
   }
 }
@@ -461,8 +461,8 @@ class _EducationSheetState extends State<_EducationSheet> {
 // Projects section
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ProjectsSection extends ConsumerWidget {
-  const _ProjectsSection({required this.profile});
+class ProjectsSection extends ConsumerWidget {
+  const ProjectsSection({required this.profile, super.key});
   final UserProfile profile;
 
   @override
@@ -498,7 +498,7 @@ class _ProjectsSection extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => _ProjectSheet(existing: existing, ref: ref),
+      builder: (context) => _ProjectSheet(existing: existing, ref: ref),
     );
   }
 }
