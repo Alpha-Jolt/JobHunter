@@ -1,0 +1,180 @@
+name: Deploy JobHunter to Production VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run Tests and Build Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python — Shared Data Persistence Layer ──────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: shared/requirements.txt
+
+      - name: Install shared layer
+        run: pip install -e shared/ -r shared/requirements.txt
+
+      - name: Run shared layer tests
+        run: pytest shared/tests/ -v --tb=short
+
+      # ── Node.js — Webapp and Admin Build Checks ─────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            webapp/package-lock.json
+            admin/package-lock.json
+
+      - name: Build webapp
+        working-directory: webapp
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.myjobhunter.in
+          NEXT_PUBLIC_APP_URL: https://myjobhunter.in
+
+      - name: Build admin panel
+        working-directory: admin
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_ADMIN_API_URL: https://admin-api.myjobhunter.in
+
+  deploy:
+    name: Deploy to Production VPS
+    needs: test
+    runs-on: ubuntu-latest
+    environment: Production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+
+            # ── Pull latest code ────────────────────────────────────────────
+            git fetch origin main
+            git checkout main
+            git pull origin main
+
+            # ── Root .env ───────────────────────────────────────────────────
+            # Used by Docker Compose for variable substitution in build args
+            echo "MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}" > .env
+
+            # ── scraper/.env ────────────────────────────────────────────────
+            echo "DEV_MODE=false" > scraper/.env
+            echo "HEADLESS=true" >> scraper/.env
+            echo "PAGES_PER_SEARCH=${{ secrets.SCRAPER_PAGES_PER_SEARCH }}" >> scraper/.env
+            echo "INDEED_RATE_LIMIT=1.0" >> scraper/.env
+            echo "NAUKRI_RATE_LIMIT=0.5" >> scraper/.env
+            echo "OUTPUT_FORMATS=json,csv" >> scraper/.env
+            echo "USE_REGISTRY=true" >> scraper/.env
+            echo "REGISTRY_PATH=../registries/jobs.json" >> scraper/.env
+            echo "LOG_LEVEL=INFO" >> scraper/.env
+            echo "JSEARCH_API_KEY=${{ secrets.JSEARCH_API_KEY }}" >> scraper/.env
+            echo "PROXY_LIST=${{ secrets.PROXY_LIST }}" >> scraper/.env
+
+            # ── orchestration/.env ──────────────────────────────────────────
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > orchestration/.env
+            echo "API_HOST=0.0.0.0" >> orchestration/.env
+            echo "API_PORT=8000" >> orchestration/.env
+            echo "LOG_LEVEL=INFO" >> orchestration/.env
+            echo "SECRET_KEY_APPROVAL=${{ secrets.SECRET_KEY_APPROVAL }}" >> orchestration/.env
+            echo "APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}" >> orchestration/.env
+            echo "MAX_APPLICATIONS_PER_DAY=10" >> orchestration/.env
+            echo "MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}" >> orchestration/.env
+
+            # ── ai_engine/.env ──────────────────────────────────────────────
+            echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" > ai_engine/.env
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ai_engine/.env
+            echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}" >> ai_engine/.env
+            echo "OPENROUTER_MODEL=${{ secrets.OPENROUTER_MODEL }}" >> ai_engine/.env
+            echo "LLM_PRIMARY_PROVIDER=${{ secrets.LLM_PRIMARY_PROVIDER }}" >> ai_engine/.env
+            echo "LLM_MAX_RETRIES=3" >> ai_engine/.env
+            echo "LLM_TIMEOUT_SECONDS=60" >> ai_engine/.env
+            echo "MAX_VARIANTS_TOTAL=50" >> ai_engine/.env
+            echo "MAX_VARIANTS_PER_SESSION=10" >> ai_engine/.env
+            echo "PATH_SCRAPER_OUTPUT_DIR=output/final" >> ai_engine/.env
+            echo "PATH_AI_OUTPUT_DIR=ai_output" >> ai_engine/.env
+            echo "LOG_LEVEL=INFO" >> ai_engine/.env
+            echo "APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}" >> ai_engine/.env
+            echo "USE_SHARED_REGISTRY=true" >> ai_engine/.env
+            echo "SHARED_JOBS_REGISTRY_PATH=../registries/jobs.json" >> ai_engine/.env
+            echo "SHARED_VARIANTS_REGISTRY_PATH=../registries/variants.json" >> ai_engine/.env
+            echo "MINIO_ENDPOINT=jobhunter-minio:9000" >> ai_engine/.env
+            echo "MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}" >> ai_engine/.env
+            echo "MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}" >> ai_engine/.env
+            echo "MINIO_BUCKET_NAME=jobhunter-resumes" >> ai_engine/.env
+            echo "MINIO_ENABLED=true" >> ai_engine/.env
+
+            # ── admin_api/.env ──────────────────────────────────────────────
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > admin_api/.env
+            echo "LOG_LEVEL=INFO" >> admin_api/.env
+            echo "API_KEY=${{ secrets.ADMIN_API_KEY }}" >> admin_api/.env
+
+            # ── observability/.env ──────────────────────────────────────────
+            echo "GF_SECURITY_ADMIN_USER=${{ secrets.GF_ADMIN_USER }}" > observability/.env
+            echo "GF_SECURITY_ADMIN_PASSWORD=${{ secrets.GF_ADMIN_PASSWORD }}" >> observability/.env
+
+            # ── Provision Cloudflare SSL Certificates ───────────────────────
+            mkdir -p nginx/ssl
+            echo "${{ secrets.CF_ORIGIN_CERT }}" > nginx/ssl/cert.pem
+            echo "${{ secrets.CF_ORIGIN_KEY }}" > nginx/ssl/key.pem
+            # Fetch Cloudflare Authenticated Origin Pull Root CA
+            curl -s -o nginx/ssl/cloudflare.crt https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem
+
+            # ── Build Next.js images with production build args ─────────────
+            docker compose -p jobhunter -f DOCKER-COMPOSE.yml -f DOCKER-COMPOSE.prod.yml build \
+              --build-arg NEXT_PUBLIC_API_BASE_URL=${{ secrets.NEXT_PUBLIC_API_BASE_URL }} \
+              --build-arg NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }} \
+              webapp
+
+            docker compose -p jobhunter -f DOCKER-COMPOSE.yml build \
+              --build-arg NEXT_PUBLIC_ADMIN_API_URL=${{ secrets.NEXT_PUBLIC_ADMIN_API_URL }} \
+              admin
+
+            docker compose -p jobhunter -f DOCKER-COMPOSE.yml -f DOCKER-COMPOSE.prod.yml build \
+              jobhunter-api admin-api scraper nginx
+
+            # ── Bring up main stack ─────────────────────────────────────────
+            docker compose -p jobhunter -f DOCKER-COMPOSE.yml -f DOCKER-COMPOSE.prod.yml up -d --remove-orphans
+
+            # ── Run database migrations ─────────────────────────────────────
+            # Wait for postgres healthcheck to pass before migrating
+            sleep 15
+            docker compose -p jobhunter -f DOCKER-COMPOSE.yml exec -T jobhunter-api \
+              alembic upgrade head
+
+            # ── MinIO bucket provisioning (idempotent) ─────────────────────
+            bash scripts/setup_minio.sh
+
+            # ── Bring up observability stack ────────────────────────────────
+            # Depends on jobhunter_jobhunter_network created by main stack above
+            docker compose -p jobhunter-obs -f DOCKER-COMPOSE.observability.yml up -d --remove-orphans
+
+            # ── Cleanup ─────────────────────────────────────────────────────
+            docker image prune -f
+
+            echo "JobHunter deployed successfully."

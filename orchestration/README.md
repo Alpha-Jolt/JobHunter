@@ -15,8 +15,8 @@ source orchestration/.venv/bin/activate
 pip install -r orchestration/requirements.txt
 cp orchestration/.env.example orchestration/.env
 uvicorn orchestration.api.main:app --reload --port 8000
-# Swagger UI: http://localhost:8000/docs
-# Admin Dashboard: http://localhost:8000/admin
+# Swagger UI: https://api.myjobhunter.in/docs
+# Admin Dashboard: https://api.myjobhunter.in/admin
 ```
 
 ---
@@ -304,7 +304,7 @@ docker compose -f DOCKER-COMPOSE.observability.yml up -d
 
 ## Admin Dashboard
 
-Accessible at `http://localhost:8000/admin`. Auto-refreshes every 30 seconds.
+Accessible at `https://api.myjobhunter.in/admin`. Auto-refreshes every 30 seconds.
 
 - **Metrics cards:** total jobs, pending variants, sent today, total applications
 - **Pending Variants tab:** copy approval token per variant
