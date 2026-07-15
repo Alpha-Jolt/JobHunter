@@ -13,13 +13,14 @@ from botocore.exceptions import ClientError
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from orchestration.auth.dependencies import get_current_user, require_role
 from orchestration.auth.models.user import RoleEnum, UserRecord
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from orchestration.api.config import get_settings
-from orchestration.api.dependencies import get_db_session
+from orchestration.api.dependencies import get_db_session, get_external_s3_client
 from orchestration.repositories.postgres_job_repository import PostgresJobRepository
 from orchestration.repositories.postgres_master_resume_repository import (
     PostgresMasterResumeRepository,
@@ -62,7 +63,21 @@ def _get_ai_service(session: AsyncSession) -> AIService:
         variant_registry=variant_repo,
         secret_key=settings.api.approval_token_secret,
     )
-    storage_svc = StorageService(output_dir=settings.paths.ai_resume_dir)
+    import boto3
+    from botocore.config import Config
+    scheme = "https" if settings.minio.minio_secure else "http"
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+        aws_access_key_id=settings.minio.minio_access_key,
+        aws_secret_access_key=settings.minio.minio_secret_key,
+        config=Config(signature_version="s3v4"),
+    )
+    storage_svc = StorageService(
+        output_dir=settings.paths.ai_resume_dir,
+        s3_client=s3_client,
+        bucket_name=settings.minio.minio_bucket,
+    )
 
     from ai_engine.core.config import get_settings as get_ai_settings
     from ai_engine.features.orchestration.builder import PipelineBuilder
@@ -87,6 +102,12 @@ def _get_ai_service(session: AsyncSession) -> AIService:
 class GenerateVariantRequest(BaseModel):
     user_id: str
     job_id: str
+    resume_file_path: str
+
+
+class BulkGenerateVariantRequest(BaseModel):
+    user_id: str
+    job_ids: list[str]
     resume_file_path: str
 
 
@@ -246,6 +267,85 @@ async def generate_variant(
     )
 
 
+@router.post("/bulk-generate", status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
+async def bulk_generate_variants(
+    body: BulkGenerateVariantRequest,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Generate tailored resume variants for multiple jobs using SSE for progress."""
+    if not body.job_ids:
+        raise HTTPException(status_code=400, detail="job_ids cannot be empty")
+    
+    if len(body.job_ids) > 100:
+        raise HTTPException(status_code=400, detail="Cannot process more than 100 jobs at a time")
+
+    # Use a Queue to stream SSE events from the background task
+    queue = asyncio.Queue()
+
+    async def yield_progress(message: str):
+        await queue.put(f"data: {{\"status\": \"Processing\", \"message\": \"{message}\"}}\n\n")
+
+    async def run_bulk():
+        try:
+            ai_service = _get_ai_service(session)
+            
+            # Download resume from MinIO
+            settings = get_settings()
+            scheme = "https" if settings.minio.minio_secure else "http"
+            s3_client = boto3.client(
+                "s3",
+                endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+                aws_access_key_id=settings.minio.minio_access_key,
+                aws_secret_access_key=settings.minio.minio_secret_key,
+                region_name="us-east-1",
+            )
+            bucket_name = settings.minio.minio_bucket
+            s3_key = body.resume_file_path
+        
+            file_name = Path(s3_key).name
+            temp_dir = tempfile.mkdtemp(dir=os.getcwd())
+            local_resume_path = os.path.join(temp_dir, file_name)
+        
+            def _download_from_minio():
+                s3_client.download_file(bucket_name, s3_key, local_resume_path)
+        
+            await asyncio.get_event_loop().run_in_executor(None, _download_from_minio)
+
+            # Call real bulk processing
+            await ai_service.bulk_process_jobs(
+                user_id=body.user_id,
+                job_ids=body.job_ids,
+                master_resume_path=local_resume_path,
+                yield_progress=yield_progress
+            )
+            
+            await queue.put("data: {\"status\": \"Success\", \"message\": \"Bulk variant generation completed.\"}\n\n")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await queue.put(f"data: {{\"status\": \"Error\", \"message\": \"Error: {e}\"}}\n\n")
+        finally:
+            await queue.put(None) # Signal end of stream
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+    # Start the background task
+    asyncio.create_task(run_bulk())
+
+    async def event_generator():
+        yield "data: {\"status\": \"Queued\", \"message\": \"Batch queued for processing\"}\n\n"
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            yield event
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
 @router.get(
     "/pending/{user_id}",
     response_model=PendingVariantsResponse,
@@ -259,9 +359,14 @@ async def get_pending_variants(
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id must not be empty")
 
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid user_id format")
+
     ai_service = _get_ai_service(session)
     job_repo = PostgresJobRepository(session)
-    variants = await ai_service.get_pending_variants(user_id)
+    variants = await ai_service.get_pending_variants(user_uuid)
 
     base_url = "http://localhost:8000"
     summaries = []
@@ -324,6 +429,51 @@ async def preview_variant(
         gaps=details["gaps"],
         match_score=float(details.get("match_score", 0)),
     )
+
+
+@router.get(
+    "/download/{variant_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def download_variant(
+    variant_id: str,
+    format: str = Query(default="docx"),
+    session: AsyncSession = Depends(get_db_session),
+    s3_client = Depends(get_external_s3_client),
+):
+    """Download the generated resume variant (docx or pdf)."""
+    try:
+        vid = uuid.UUID(variant_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid variant_id")
+
+    variant_repo = PostgresVariantRepository(session)
+    try:
+        variant = await variant_repo.get(vid)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    settings = get_settings()
+    
+    file_key = variant.docx_key if format == "docx" else variant.pdf_key
+    if not file_key:
+        raise HTTPException(status_code=404, detail=f"No {format} file generated for this variant yet")
+
+    from fastapi.responses import RedirectResponse
+    
+    filename = f"Resume_{variant_id}.{format}"
+    # Force download via response-content-disposition
+    url = s3_client.generate_presigned_url(
+        'get_object',
+        Params={
+            'Bucket': settings.minio.minio_bucket, 
+            'Key': file_key,
+            'ResponseContentDisposition': f'attachment; filename="{filename}"'
+        },
+        ExpiresIn=3600
+    )
+    return RedirectResponse(url=url)
 
 
 @router.get(

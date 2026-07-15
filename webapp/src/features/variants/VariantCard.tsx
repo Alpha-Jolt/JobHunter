@@ -8,6 +8,8 @@ import { useUiStore } from "@/shared/state/uiStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/Card";
 import { Button } from "@/shared/components/Button";
 import { Badge } from "@/shared/components/Badge";
+import { config } from "@/lib/config";
+import { getAccessToken } from "@/shared/api/client";
 import type { VariantSummary, PreviewVariantResponse } from "@/shared/api/types";
 
 interface VariantCardProps {
@@ -66,6 +68,61 @@ export function VariantCard({ variant }: VariantCardProps) {
     }
   };
 
+  const handleDownload = (format: string, action: "download" | "preview" = "download") => {
+    const url = `${config.apiBaseUrl}/api/ai/download/${variant.variant_id}?format=${format}`;
+    const token = getAccessToken();
+    
+    fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("File not available");
+      return res.blob();
+    })
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob);
+      if (action === "preview" && format === "pdf") {
+        window.open(blobUrl, "_blank");
+        // We can't immediately revoke the URL if it's opened in a new tab,
+        // so we leave it to be garbage collected when the tab closes.
+      } else {
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Resume_${variant.variant_id}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(blobUrl);
+      }
+    })
+    .catch(() => {
+      addToast("error", "Failed to " + action + " " + format.toUpperCase());
+    });
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "bg-green-500";
+    if (score >= 60) return "bg-yellow-500";
+    if (score >= 45) return "bg-orange-500";
+    return "bg-red-500";
+  };
+  
+  const getTextColor = (score: number) => {
+    if (score >= 80) return "text-green-600 dark:text-green-400";
+    if (score >= 60) return "text-yellow-600 dark:text-yellow-400";
+    if (score >= 45) return "text-orange-600 dark:text-orange-400";
+    return "text-red-600 dark:text-red-400";
+  };
+  
+  const getScoreLabel = (score: number) => {
+    if (score >= 80) return "High Match";
+    if (score >= 60) return "Medium Match";
+    if (score >= 45) return "Low Match";
+    return "Poor Match";
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -78,16 +135,21 @@ export function VariantCard({ variant }: VariantCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className={`text-xs font-semibold ${getTextColor(variant.match_score)}`}>
+            {getScoreLabel(variant.match_score)}
+          </span>
+          <span className={`text-xs font-medium w-10 text-right ${getTextColor(variant.match_score)}`}>
+            {Math.round(variant.match_score)}%
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mb-4">
           <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
             <div
-              className="h-2 rounded-full bg-primary transition-all"
+              className={`h-2 rounded-full transition-all ${getScoreColor(variant.match_score)}`}
               style={{ width: `${Math.min(Math.round(variant.match_score), 100)}%` }}
             />
           </div>
-          <span className="text-xs font-medium text-muted-foreground w-10 text-right">
-            {Math.round(variant.match_score)}%
-          </span>
         </div>
 
         {/* Preview panel */}
@@ -118,6 +180,27 @@ export function VariantCard({ variant }: VariantCardProps) {
           >
             <Eye className="h-3.5 w-3.5" />
             {showPreview ? "Hide" : "Preview"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload("docx")}
+          >
+            DOCX
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload("pdf", "download")}
+          >
+            PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleDownload("pdf", "preview")}
+          >
+            Preview PDF
           </Button>
           <Button
             size="sm"

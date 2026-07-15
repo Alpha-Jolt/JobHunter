@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/shared/state/authStore";
 import { useUserProfileStore } from "@/shared/state/userProfileStore";
-import { authApi } from "@/shared/api/gateway";
+import { useProfileStore } from "@/shared/state/profileStore";
+import { authApi, profileApi } from "@/shared/api/gateway";
 import { setAccessToken } from "@/shared/api/client";
 import client from "@/shared/api/client";
 import { Loader2 } from "lucide-react";
@@ -12,6 +13,7 @@ import { Loader2 } from "lucide-react";
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, setAuth, clearAuth } = useAuthStore();
   const { setResume } = useUserProfileStore();
+  const { profile, setProfile } = useProfileStore();
   const [isInitializing, setIsInitializing] = useState(!isAuthenticated);
   const attempted = useRef(false);
   const router = useRouter();
@@ -42,6 +44,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         setIsInitializing(false);
       });
   }, [isAuthenticated, setAuth, clearAuth, router, setResume]);
+
+  // Global fetch for profile
+  useEffect(() => {
+    if (isAuthenticated && !profile) {
+      profileApi.getMe()
+        .then((data) => setProfile(data))
+        .catch(() => {
+          // It's okay if profile doesn't exist yet (404)
+        });
+    }
+  }, [isAuthenticated, profile, setProfile]);
 
   if (isInitializing) {
     return (

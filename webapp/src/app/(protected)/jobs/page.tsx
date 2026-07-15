@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/shared/state/authStore";
 import { useJobStore } from "@/shared/state/jobStore";
-import { useVariants } from "@/features/variants/useVariants";
 import { useUserProfileStore } from "@/shared/state/userProfileStore";
 import { useUiStore } from "@/shared/state/uiStore";
 import { useJobs } from "@/features/jobs/useJobs";
@@ -10,17 +10,21 @@ import { JobCard } from "@/features/jobs/JobCard";
 import { JobFilters } from "@/features/jobs/JobFilters";
 import { Skeleton } from "@/shared/components/Skeleton";
 import { Button } from "@/shared/components/Button";
+import { config } from "@/lib/config";
+import { getAccessToken } from "@/shared/api/client";
 import type { JobRecord } from "@/shared/api/types";
 
 export default function JobsPage() {
   const { jobs, total, isLoading } = useJobs();
-  const { filters, setFilters, setSelectedJob } = useJobStore();
+  const { filters, setFilters } = useJobStore();
   const { resumeKey } = useUserProfileStore();
-  const { generate } = useVariants();
+  const { user } = useAuthStore();
   const { addToast } = useUiStore();
 
   const [pageInput, setPageInput] = useState("");
-  const [generatingJobId, setGeneratingJobId] = useState<string | null>(null);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
 
   const limit = filters.limit || 20;
   const currentPage = Math.floor((filters.offset || 0) / limit) + 1;
@@ -33,15 +37,82 @@ export default function JobsPage() {
   // Filtering is now handled by the backend
   const filteredJobs = jobs;
 
-  const handleSelect = async (job: JobRecord) => {
+  const handleSelect = (job: JobRecord) => {
+    const next = new Set(selectedJobIds);
+    if (next.has(job.job_id)) next.delete(job.job_id);
+    else if (next.size < 100) next.add(job.job_id);
+    else addToast("warning", "You can only select up to 100 jobs at a time.");
+    setSelectedJobIds(next);
+  };
+
+  const handleBulkGenerate = async () => {
     if (!resumeKey) {
-      addToast("warning", "Upload your resume first before generating a variant.");
+      addToast("warning", "Upload your resume first before generating variants.");
       return;
     }
-    setGeneratingJobId(job.job_id);
-    setSelectedJob(job);
-    await generate(job.job_id, resumeKey);
-    setGeneratingJobId(null);
+    
+    setIsBulkGenerating(true);
+    setBulkProgress("Starting...");
+    
+    try {
+      const token = getAccessToken();
+      const response = await fetch(`${config.apiBaseUrl}/api/ai/bulk-generate`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ 
+          user_id: user?.user_id || "",
+          job_ids: Array.from(selectedJobIds),
+          resume_file_path: resumeKey
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start bulk generation");
+      }
+
+      if (!response.body) {
+        throw new Error("No response body");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let isDone = false;
+      while (!isDone) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.status === "Error" || data.message.startsWith("Warning:")) {
+                addToast("error", data.message);
+              } else if (data.status === "Success") {
+                setBulkProgress("Success");
+                addToast("success", "Bulk variant generation completed.");
+                setSelectedJobIds(new Set());
+                isDone = true;
+              } else {
+                setBulkProgress(data.message);
+              }
+            } catch {
+              // ignore parse errors for partial chunks
+            }
+          }
+        }
+      }
+    } catch (err: unknown) {
+      addToast("error", err instanceof Error ? err.message : "Failed to bulk generate variants.");
+    } finally {
+      setIsBulkGenerating(false);
+      setTimeout(() => setBulkProgress(""), 2000);
+    }
   };
 
   const handlePageSubmit = (e: React.FormEvent) => {
@@ -55,11 +126,29 @@ export default function JobsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Jobs</h1>
-        <p className="text-sm text-muted-foreground mt-1">Discover and apply to matching roles.</p>
+        {selectedJobIds.size > 0 && (
+          <div className="flex items-center gap-4 bg-secondary px-4 py-2 rounded-lg border border-border shadow-sm">
+            <span className="text-sm font-medium">{selectedJobIds.size} selected</span>
+            <Button size="sm" onClick={handleBulkGenerate} disabled={isBulkGenerating}>
+              {isBulkGenerating ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-3.5 w-3.5 rounded-full border-2 border-primary-foreground border-r-transparent animate-spin" />
+                  {bulkProgress}
+                </span>
+              ) : (
+                "Generate Variants"
+              )}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedJobIds(new Set())} disabled={isBulkGenerating}>
+              Clear
+            </Button>
+          </div>
+        )}
       </div>
-
+      <p className="text-sm text-muted-foreground mt-1">Discover and apply to matching roles.</p>
+      
       <JobFilters />
 
       {isLoading ? (
@@ -78,7 +167,7 @@ export default function JobsPage() {
                 key={job.job_id}
                 job={job}
                 onSelect={handleSelect}
-                isGenerating={generatingJobId === job.job_id}
+                isSelected={selectedJobIds.has(job.job_id)}
               />
             ))}
           </div>

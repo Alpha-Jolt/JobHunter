@@ -37,8 +37,8 @@ export function UserMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant="ghost" size="icon" aria-label="User menu">
-          <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center overflow-hidden">
+        <Button variant="ghost" size="icon" aria-label="User menu" className="rounded-full overflow-hidden shrink-0 !p-0">
+          <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center overflow-hidden shrink-0">
             {profile?.avatar_url ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -3,7 +3,7 @@
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.models.exceptions import RegistryError, VariantNotFoundError
@@ -62,20 +62,14 @@ class PostgresVariantRepository(VariantRegistryBase):
         import orchestration.db.models as _m
         ResumeVariant = _m.ResumeVariant
 
-        # Enforce uniqueness
-        existing = await self._session.execute(
-            select(func.count())
-            .select_from(ResumeVariant)
+        # Delete existing variant if regenerating
+        await self._session.execute(
+            delete(ResumeVariant)
             .where(
                 ResumeVariant.user_id == variant.user_id,
                 ResumeVariant.job_id == str(variant.job_id),
             )
         )
-        if (existing.scalar() or 0) > 0:
-            raise RegistryError(
-                "Variant already exists for this (user_id, job_id)",
-                {"user_id": variant.user_id, "job_id": str(variant.job_id)},
-            )
 
         # Enforce cap
         total = await self.count_by_user(variant.user_id)
@@ -189,7 +183,7 @@ class PostgresVariantRepository(VariantRegistryBase):
         )
         return [_orm_to_record(row) for row in result.scalars().all()]
 
-    async def get_pending_for_user(self, user_id: str) -> List[VariantRecord]:
+    async def get_pending_for_user(self, user_id: uuid.UUID) -> List[VariantRecord]:
         """Return pending variants for a user.
 
         Args:

@@ -9,3 +9,4 @@ registries/
 .coverage
 htmlcov/
 README.md
+docs/

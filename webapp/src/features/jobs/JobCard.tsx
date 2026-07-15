@@ -1,16 +1,15 @@
 "use client";
 
-import { MapPin, Building2, Zap } from "lucide-react";
+import { MapPin, Building2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/Card";
 import { Badge } from "@/shared/components/Badge";
-import { Button } from "@/shared/components/Button";
 import { truncate, formatRelative } from "@/shared/utils/cn";
 import type { JobRecord } from "@/shared/api/types";
 
 interface JobCardProps {
   job: JobRecord;
   onSelect: (job: JobRecord) => void;
-  isGenerating?: boolean;
+  isSelected?: boolean;
 }
 
 const trustVariant = {
@@ -19,9 +18,12 @@ const trustVariant = {
   unknown: "outline",
 } as const;
 
-export function JobCard({ job, onSelect, isGenerating = false }: JobCardProps) {
+export function JobCard({ job, onSelect, isSelected = false }: JobCardProps) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card 
+      className={`cursor-pointer hover:shadow-md transition-shadow relative ${isSelected ? 'ring-2 ring-primary' : ''}`}
+      onClick={() => onSelect(job)}
+    >
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -58,14 +60,6 @@ export function JobCard({ job, onSelect, isGenerating = false }: JobCardProps) {
         )}
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{formatRelative(job.created_at)}</span>
-          <Button size="sm" onClick={() => onSelect(job)} disabled={isGenerating}>
-            {isGenerating ? (
-              <span className="h-3.5 w-3.5 rounded-full border-2 border-primary-foreground border-r-transparent animate-spin" />
-            ) : (
-              <Zap className="h-3.5 w-3.5" />
-            )}
-            {isGenerating ? "Generating..." : "Generate Variant"}
-          </Button>
         </div>
       </CardContent>
     </Card>

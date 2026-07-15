@@ -11,6 +11,7 @@ from shared.models.exceptions import RegistryError
 from shared.models.variant_record import VariantRecord
 from shared.registries.base import JobRegistryBase, VariantRegistryBase
 
+_background_tasks = set()
 
 class AIServiceError(Exception):
     """Raised when the AI service encounters an unrecoverable error."""
@@ -78,6 +79,11 @@ class AIService:
             raise ValueError(f"Resume file not found: {master_resume_path}")
         if not job_record or not getattr(job_record, "description", None):
             raise ValueError("job_record must have a non-empty description")
+
+        # Check for existing duplicate variant
+        existing_variants = await self.variant_registry.get_for_job(job_uuid)
+        if any(str(v.user_id) == user_id for v in existing_variants):
+            raise AIServiceError("Duplicate: Variant already generated for this job")
 
         # 2. Parse resume and store in master_resumes
         from orchestration.core.spans import traced
@@ -151,27 +157,22 @@ class AIService:
             ai_failure_total.add(1)
             raise AIServiceError(f"Variant generation failed: {exc}") from exc
 
-        optimised_variant, comparison_result = pipeline_result
+        optimised_variant, comparison_result, variant_obj = pipeline_result
 
         async with traced("Persist Variant"):
-            # 5. Upload output files to storage
             variant_id = uuid.uuid4()
             base_key = f"{user_id}/{job_uuid}"
-            try:
-                pdf_key = await self.storage_service.upload_file(
-                    optimised_variant.get("pdf_path", ""),
-                    f"{base_key}/resume.pdf",
+            
+            # Start async rendering if not rejected
+            if variant_obj and not optimised_variant.get("is_rejected"):
+                import asyncio
+                task = asyncio.create_task(
+                    self._render_and_upload_async(
+                        variant_id, base_key, variant_obj
+                    )
                 )
-                docx_key = await self.storage_service.upload_file(
-                    optimised_variant.get("docx_path", ""),
-                    f"{base_key}/resume.docx",
-                )
-                cover_letter_key = await self.storage_service.upload_file(
-                    optimised_variant.get("cover_letter_path", ""),
-                    f"{base_key}/cover_letter.pdf",
-                )
-            except Exception as exc:
-                raise AIServiceError(f"File storage failed: {exc}") from exc
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
 
             # 6. Build and store VariantRecord
             curated_json = optimised_variant.get("curated_json", {})
@@ -183,12 +184,12 @@ class AIService:
                 user_id=user_id,
                 job_id=job_uuid,
                 master_resume_id=master_resume_id,
-                pdf_key=pdf_key,
-                docx_key=docx_key,
-                cover_letter_key=cover_letter_key,
+                pdf_key="",
+                docx_key="",
+                cover_letter_key="",
                 curated_json={**curated_json, "match_score": match_score},
                 gaps_identified=gaps,
-                approval_status="pending",
+                approval_status="rejected" if optimised_variant.get("is_rejected") else "pending",
                 prompt_version=optimised_variant.get("prompt_version", ""),
                 created_at=datetime.now(timezone.utc),
             )
@@ -207,6 +208,245 @@ class AIService:
         await self.variant_registry.update_approval_token(variant_id, token)
 
         return variant_record
+
+    async def bulk_process_jobs(
+        self,
+        user_id: str,
+        job_ids: list[str],
+        master_resume_path: str,
+        yield_progress=None
+    ):
+        """Group multiple jobs and generate one variant per group.
+        
+        Args:
+            user_id: User identifier.
+            job_ids: List of UUID strings.
+            master_resume_path: Filesystem path to the resume file.
+            yield_progress: Async callback function for streaming SSE progress.
+        """
+        import json
+        from orchestration.core.spans import traced
+        from ai_engine.features.llm.router import LLMRouter
+        from ai_engine.core.config import get_settings as get_ai_settings
+        from orchestration.db.models import Job as DBJobRecord
+        
+        if not job_ids:
+            return
+
+        if yield_progress: await yield_progress("Fetching job descriptions...")
+
+        # 1. Fetch job records
+        job_records: list[DBJobRecord] = []
+        valid_job_ids = []
+        for jid in job_ids:
+            try:
+                job_uuid = uuid.UUID(str(jid))
+                job = await self.job_registry.get(job_uuid)
+                if getattr(job, "description", None):
+                    job_records.append(job)
+                    valid_job_ids.append(str(job_uuid))
+            except Exception:
+                continue
+
+        if not job_records:
+            if yield_progress: await yield_progress("No valid jobs found to process.")
+            return
+
+        if yield_progress: await yield_progress(f"Analyzing and grouping {len(job_records)} jobs (this takes a few seconds)...")
+
+        # 2. Group jobs via LLM
+        ai_settings = get_ai_settings()
+        router = LLMRouter(ai_settings.llm)
+        
+        jobs_json = json.dumps([
+            {
+                "job_id": str(job.job_id),
+                "title": getattr(job, "title", ""),
+                "description": getattr(job, "description", "")[:1000] # Truncate to save tokens
+            } for job in job_records
+        ])
+        
+        prompt = f"""You are an expert technical recruiter and AI assistant.
+Your task is to analyze a list of job descriptions and group them into at most 3 logical role categories (e.g., "Full Stack Developer", "Data Scientist") based on similar skills and responsibilities.
+For each group, synthesize a single, comprehensive "combined_description" that encapsulates the core requirements across all jobs in that group.
+
+Jobs:
+{jobs_json}
+
+Return a JSON object containing an array of groups, each with a 'role_name', a list of 'job_ids' belonging to it, and the 'combined_description'. Each job_id MUST be assigned to exactly one group.
+"""
+        schema = {
+            "type": "object",
+            "properties": {
+                "groups": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "role_name": {"type": "string"},
+                            "job_ids": {"type": "array", "items": {"type": "string"}},
+                            "combined_description": {"type": "string"}
+                        },
+                        "required": ["role_name", "job_ids", "combined_description"]
+                    }
+                }
+            },
+            "required": ["groups"]
+        }
+        
+        try:
+            llm_result = await router.complete(prompt, schema, "bulk_grouper_v1")
+            group_data = json.loads(llm_result.content)
+            groups = group_data.get("groups", [])
+        except Exception as e:
+            if yield_progress: await yield_progress(f"Failed to group jobs: {e}. Falling back to individual processing.")
+            groups = [{"role_name": "Fallback", "job_ids": valid_job_ids, "combined_description": getattr(job_records[0], "description", "")}]
+
+        if yield_progress: await yield_progress(f"Jobs categorized into {len(groups)} distinct roles. Generating variants...")
+
+        # 3. Process each group
+        from ai_engine.features.ingestion.models.job_record import JobRecord as AIJobRecord
+        from ai_engine.features.orchestration.models.pipeline_config import PipelineConfig
+        from ai_engine.core.types import PipelineMode
+
+        for idx, group in enumerate(groups):
+            g_job_ids = group.get("job_ids", [])
+            # Filter to only job_ids we actually fetched
+            g_job_ids = [j for j in g_job_ids if j in valid_job_ids]
+            if not g_job_ids:
+                continue
+                
+            role_name = group.get("role_name", "Unknown Role")
+            if yield_progress: await yield_progress(f"Generating optimized resume for: {role_name} ({len(g_job_ids)} jobs) - Group {idx+1}/{len(groups)}...")
+            
+            # Create a pseudo job for the group
+            pseudo_job = AIJobRecord(
+                job_id=g_job_ids[0], # Just use the first one as a dummy ID for the pipeline
+                source="bulk_grouping",
+                title=role_name,
+                company="Multiple Companies",
+                description=group.get("combined_description", ""),
+                skills_required=[],
+                apply_email="",
+                apply_url="",
+                location="Various",
+            )
+            
+            config = PipelineConfig(
+                resume_file_path=Path(master_resume_path),
+                job_ids_to_process=[g_job_ids[0]],
+                user_id=user_id,
+                session_id=str(uuid.uuid4()),
+                mode=PipelineMode.GENERATE,
+                auto_approve=False,
+                use_shared_registry=False,
+            )
+            
+            try:
+                pipeline_result = await self._run_pipeline_for_job(
+                    config=config,
+                    ai_job=pseudo_job,
+                    resume_path=Path(master_resume_path),
+                    user_id=user_id,
+                )
+            except Exception as e:
+                if yield_progress: await yield_progress(f"Warning: Failed to generate variant for {role_name}: {e}")
+                continue
+                
+            optimised_variant, comparison_result, variant_obj = pipeline_result
+            
+            # 4. Save a VariantRecord for EACH job in the group reusing the same curated_json
+            master_resume_id, _, _ = await self.master_resume_registry.get_or_create(user_id=user_id, file_path=master_resume_path)
+            
+            for jid in g_job_ids:
+                job_uuid = uuid.UUID(jid)
+                variant_id = uuid.uuid4()
+                base_key = f"{user_id}/{job_uuid}"
+                
+                # Optionally trigger render for each
+                if variant_obj and not optimised_variant.get("is_rejected"):
+                    import asyncio
+                    asyncio.create_task(
+                        self._render_and_upload_async(
+                            variant_id, base_key, variant_obj
+                        )
+                    )
+                
+                curated_json = optimised_variant.get("curated_json", {})
+                gaps = optimised_variant.get("gaps", [])
+                match_score = comparison_result.get("match_score", 0)
+                
+                variant_record = VariantRecord(
+                    variant_id=variant_id,
+                    user_id=user_id,
+                    job_id=job_uuid,
+                    master_resume_id=master_resume_id,
+                    pdf_key="",
+                    docx_key="",
+                    cover_letter_key="",
+                    curated_json={**curated_json, "match_score": match_score},
+                    gaps_identified=gaps,
+                    approval_status="rejected" if optimised_variant.get("is_rejected") else "pending",
+                    prompt_version=optimised_variant.get("prompt_version", ""),
+                    created_at=datetime.now(timezone.utc),
+                )
+                
+                await self.variant_registry.save(variant_record)
+                
+                # Fetch job record to get email
+                original_job = next((j for j in job_records if str(j.job_id) == str(jid)), None)
+                user_email = getattr(original_job, "apply_email", "") or "" if original_job else ""
+                
+                token = self.approval_service.generate_approval_token(
+                    str(variant_id), user_email
+                )
+                variant_record.approval_token = token
+                await self.variant_registry.update_approval_token(variant_id, token)
+
+    async def _render_and_upload_async(self, variant_id, base_key, variant_obj):
+        """Background task to generate and upload docx and pdf."""
+        import tempfile
+        import os
+        from pathlib import Path
+        from ai_engine.features.output.renderers.resume_renderer import render_resume
+        
+        try:
+            temp_dir = tempfile.mkdtemp()
+            out_dir = Path(temp_dir)
+            
+            docx_path_str, pdf_path_str = await render_resume(variant_obj, out_dir)
+            
+            docx_key = await self.storage_service.upload_file(
+                docx_path_str,
+                f"variants/{base_key}/resume.docx",
+            )
+            
+            pdf_key = ""
+            if pdf_path_str and Path(pdf_path_str).exists():
+                pdf_key = await self.storage_service.upload_file(
+                    pdf_path_str,
+                    f"variants/{base_key}/resume.pdf",
+                )
+            
+            # Update VariantRecord with the docx_key and pdf_key
+            import orchestration.db.models as _m
+            from orchestration.db.connection import get_session_factory
+            from sqlalchemy import update
+            async_session_maker = get_session_factory()
+            async with async_session_maker() as session:
+                await session.execute(
+                    update(_m.ResumeVariant)
+                    .where(_m.ResumeVariant.variant_id == variant_id)
+                    .values(docx_key=docx_key, pdf_key=pdf_key)
+                )
+                await session.commit()
+        except Exception as exc:
+            from ai_engine.core.logging_.logger import get_logger
+            logger = get_logger(__name__)
+            logger.error("async_render_failed", variant_id=str(variant_id), error=str(exc))
+        finally:
+            import shutil
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def _run_pipeline_for_job(
         self,
@@ -242,7 +482,10 @@ class AIService:
 
         try:
             comparison = await executor._comparator.compare(resume, analysis)
-            variant = await executor._optimiser.optimise(resume, analysis, comparison)
+            if comparison.match_score < 45:
+                variant = None
+            else:
+                variant = await executor._optimiser.optimise(resume, analysis, comparison)
         except Exception as exc:
             raise AIServiceError(f"Variant generation failed: {exc}") from exc
         finally:
@@ -250,14 +493,28 @@ class AIService:
             ai_request_duration.record(duration_ms)
             resume_processing_duration.record(duration_ms)
 
-        curated_json = {
-            "personal": resume.personal.model_dump(),
-            "summary": variant.rewritten_summary,
-            "experience": [e.model_dump() for e in variant.reordered_experience],
-            "skills": variant.prioritized_skills,
-            "projects": [p.model_dump() for p in variant.selected_projects],
-            "certifications": variant.selected_certifications,
-        }
+        if variant:
+            curated_json = {
+                "personal": resume.personal.model_dump(),
+                "summary": variant.rewritten_summary,
+                "experience": [e.model_dump() for e in variant.reordered_experience],
+                "skills": variant.prioritized_skills,
+                "projects": [p.model_dump() for p in variant.selected_projects],
+                "certifications": variant.selected_certifications,
+            }
+            gaps = list(variant.gaps)
+            prompt_version = variant.prompt_version_used
+        else:
+            curated_json = {
+                "personal": resume.personal.model_dump(),
+                "summary": "Rejected: Match score too low.",
+                "experience": [],
+                "skills": comparison.matched_skills,
+                "projects": [],
+                "certifications": [],
+            }
+            gaps = comparison.gap_skills
+            prompt_version = comparison.prompt_version_used
 
         return (
             {
@@ -268,13 +525,15 @@ class AIService:
                 "pdf_path": "",
                 "docx_path": "",
                 "cover_letter_path": "",
+                "is_rejected": variant is None,
             },
             {
                 "match_score": comparison.match_score,
             },
+            variant
         )
 
-    async def get_pending_variants(self, user_id: str) -> List[VariantRecord]:
+    async def get_pending_variants(self, user_id: uuid.UUID) -> List[VariantRecord]:
         """Return all pending variants for a user.
 
         Args:
