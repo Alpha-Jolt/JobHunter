@@ -7,6 +7,8 @@ import type {
   ResumeUploadResponse,
   GenerateVariantResponse,
   PendingVariantsResponse,
+  AllVariantsResponse,
+  VariantSummaryFull,
   PreviewVariantResponse,
   ApproveVariantResponse,
   ApplicationRecord,
@@ -110,7 +112,15 @@ export const variantsApi = {
     client
       .post(`/api/ai/reject/${variantId}`, { user_feedback })
       .then((r) => r.data),
+
+  all: (userId: string) =>
+    client
+      .get<AllVariantsResponse>(`/api/ai/variants/${userId}`)
+      .then((r) => r.data),
 };
+
+// Re-export for convenience
+export type { VariantSummaryFull };
 
 // ── Applications ──────────────────────────────────────────────────────────────
 

@@ -137,6 +137,26 @@ class PendingVariantsResponse(BaseModel):
     pending: list[VariantSummary]
 
 
+class VariantSummaryFull(BaseModel):
+    variant_id: str
+    job_id: str
+    job_title: str
+    company_name: str
+    match_score: float
+    approval_status: str
+    created_at: Optional[str]
+    approved_at: Optional[str]
+    approval_link: str
+    pdf_key: str
+    docx_key: str
+    s3_upload_failed: bool
+
+
+class AllVariantsResponse(BaseModel):
+    total: int
+    variants: list[VariantSummaryFull]
+
+
 class PreviewVariantResponse(BaseModel):
     variant_id: str
     approval_status: str
@@ -400,6 +420,68 @@ async def get_pending_variants(
 
 
 @router.get(
+    "/variants/{user_id}",
+    response_model=AllVariantsResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def get_all_variants(
+    user_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> AllVariantsResponse:
+    """List all variants for a user across all statuses (pending/approved/rejected).
+
+    Approved variants remain visible with approval_status='approved' so users
+    can review, download, or track their history.
+    """
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id must not be empty")
+
+    variant_repo = PostgresVariantRepository(session)
+    job_repo = PostgresJobRepository(session)
+    variants = await variant_repo.get_for_user(user_id)
+
+    base_url = "http://localhost:8000"
+    summaries = []
+    for v in variants:
+        curated = dict(v.curated_json or {})
+        match_score = float(curated.get("match_score", 0))
+        job_title = ""
+        company_name = ""
+        try:
+            job = await job_repo.get(v.job_id)
+            job_title = getattr(job, "title", "")
+            company_name = getattr(job, "company_name", "")
+        except Exception:
+            pass
+
+        summaries.append(
+            VariantSummaryFull(
+                variant_id=str(v.variant_id),
+                job_id=str(v.job_id),
+                job_title=job_title,
+                company_name=company_name,
+                match_score=match_score,
+                approval_status=v.approval_status,
+                created_at=v.created_at.isoformat() if v.created_at else None,
+                approved_at=v.approved_at.isoformat() if v.approved_at else None,
+                approval_link=_make_approval_link(
+                    base_url, str(v.variant_id), v.approval_token or ""
+                ),
+                pdf_key=v.pdf_key or "",
+                docx_key=v.docx_key or "",
+                s3_upload_failed=bool(v.s3_upload_failed),
+            )
+        )
+
+    # Sort: pending first, then approved, then rejected — newest first within each group
+    order = {"pending": 0, "approved": 1, "rejected": 2}
+    summaries.sort(key=lambda x: (order.get(x.approval_status, 9), x.created_at or ""), reverse=False)
+
+    return AllVariantsResponse(total=len(summaries), variants=summaries)
+
+
+@router.get(
     "/preview/{variant_id}",
     response_model=PreviewVariantResponse,
     status_code=status.HTTP_200_OK,
@@ -474,6 +556,50 @@ async def download_variant(
         ExpiresIn=3600
     )
     return RedirectResponse(url=url)
+
+
+@router.get(
+    "/pdf-preview/{variant_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def pdf_preview(
+    variant_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    s3_client=Depends(get_external_s3_client),
+):
+    """Return a presigned URL for inline PDF preview (opens in browser, not download)."""
+    try:
+        vid = uuid.UUID(variant_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid variant_id")
+
+    variant_repo = PostgresVariantRepository(session)
+    try:
+        variant = await variant_repo.get(vid)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    settings = get_settings()
+    file_key = variant.pdf_key
+    if not file_key:
+        # Fall back to docx if pdf not generated
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not yet generated for this variant. Try again shortly or download the DOCX.",
+        )
+
+    url = s3_client.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": settings.minio.minio_bucket,
+            "Key": file_key,
+            "ResponseContentType": "application/pdf",
+            "ResponseContentDisposition": "inline",
+        },
+        ExpiresIn=3600,
+    )
+    return {"url": url, "variant_id": variant_id, "expires_in": 3600}
 
 
 @router.get(

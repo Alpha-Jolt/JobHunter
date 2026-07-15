@@ -81,6 +81,19 @@ export interface VariantSummary {
   approval_link: string;
 }
 
+export interface VariantSummaryFull extends VariantSummary {
+  approval_status: "pending" | "approved" | "rejected";
+  approved_at: string | null;
+  pdf_key: string;
+  docx_key: string;
+  s3_upload_failed: boolean;
+}
+
+export interface AllVariantsResponse {
+  total: number;
+  variants: VariantSummaryFull[];
+}
+
 export interface GenerateVariantResponse {
   variant_id: string;
   approval_token: string;

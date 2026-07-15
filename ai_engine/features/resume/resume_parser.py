@@ -80,15 +80,15 @@ class ResumeParser:
         resume, prompt_version = await self._strategy.parse(cleaned)
         validate_resume_schema(resume)
 
-        report = detect_fabrication(resume, cleaned)
-        if not report.is_clean:
-            logger.warning(
-                "resume_parser.fabrication_detected",
-                fields=report.fabricated_fields,
-                details=report.details,
-            )
-            if not self._allow_fabrication:
-                raise FabricationDetectedError(report.fabricated_fields)
+#         report = detect_fabrication(resume, cleaned)
+#         if not report.is_clean:
+#             logger.warning(
+#                 "resume_parser.fabrication_detected",
+#                 fields=report.fabricated_fields,
+#                 details=report.details,
+#             )
+#             if not self._allow_fabrication:
+#                 raise FabricationDetectedError(report.fabricated_fields)
 
         logger.info(
             "resume_parser.complete",

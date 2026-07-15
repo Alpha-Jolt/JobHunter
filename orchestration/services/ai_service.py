@@ -555,8 +555,8 @@ Return a JSON object containing an array of groups, each with a 'role_name', a l
         return (
             {
                 "curated_json": curated_json,
-                "gaps": list(variant.gaps),
-                "prompt_version": variant.prompt_version_used,
+                "gaps": gaps,
+                "prompt_version": prompt_version,
                 "match_score": comparison.match_score,
                 "pdf_path": "",
                 "docx_path": "",

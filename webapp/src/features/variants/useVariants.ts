@@ -8,21 +8,22 @@ import { useUiStore } from "@/shared/state/uiStore";
 
 export function useVariants() {
   const { user } = useAuthStore();
-  const { pendingVariants, isLoading, error, setPending, setLoading, setError } = useVariantStore();
+  const { allVariants, pendingVariants, isLoading, error, setAll, updateVariantStatus, setLoading, setError } =
+    useVariantStore();
   const { addToast } = useUiStore();
 
-  const fetchPending = useCallback(async () => {
+  const fetchAll = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await variantsApi.pending(user.user_id);
-      setPending(data.pending);
+      const data = await variantsApi.all(user.user_id);
+      setAll(data.variants);
     } catch {
       setError("Failed to load variants.");
     } finally {
       setLoading(false);
     }
-  }, [user, setPending, setLoading, setError]);
+  }, [user, setAll, setLoading, setError]);
 
   const generate = useCallback(
     async (jobId: string, resumeKey: string): Promise<boolean> => {
@@ -30,9 +31,8 @@ export function useVariants() {
       setLoading(true);
       try {
         const data = await variantsApi.generate(user.user_id, jobId, resumeKey);
-        // Token is fetched securely on demand, no sessionStorage storage required.
         addToast("success", `Variant generated for ${data.job_title}. Review and approve it.`);
-        await fetchPending();
+        await fetchAll();
         return true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Variant generation failed.";
@@ -42,12 +42,44 @@ export function useVariants() {
         setLoading(false);
       }
     },
-    [user, fetchPending, setLoading, addToast]
+    [user, fetchAll, setLoading, addToast]
+  );
+
+  const approve = useCallback(
+    async (variantId: string): Promise<boolean> => {
+      try {
+        const { approval_token } = await variantsApi.getToken(variantId);
+        await variantsApi.approve(variantId, approval_token);
+        updateVariantStatus(variantId, "approved");
+        addToast("success", "Variant approved. You can now send the application.");
+        return true;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Approval failed.";
+        addToast("error", msg);
+        return false;
+      }
+    },
+    [updateVariantStatus, addToast]
+  );
+
+  const reject = useCallback(
+    async (variantId: string): Promise<boolean> => {
+      try {
+        await variantsApi.reject(variantId);
+        updateVariantStatus(variantId, "rejected");
+        addToast("info", "Variant rejected.");
+        return true;
+      } catch {
+        addToast("error", "Rejection failed.");
+        return false;
+      }
+    },
+    [updateVariantStatus, addToast]
   );
 
   useEffect(() => {
-    fetchPending();
-  }, [fetchPending]);
+    fetchAll();
+  }, [fetchAll]);
 
-  return { pendingVariants, isLoading, error, generate, refetch: fetchPending };
+  return { allVariants, pendingVariants, isLoading, error, generate, approve, reject, refetch: fetchAll };
 }

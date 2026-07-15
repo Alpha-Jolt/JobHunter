@@ -89,17 +89,18 @@ async def get_metrics(
 @router.get("/variants-pending",
     dependencies=[Depends(require_role(RoleEnum.ADMIN))])
 async def get_pending_variants(
+    status: Optional[str] = Query(default=None, description="Filter by status: pending, approved, rejected. Omit for all."),
     session: AsyncSession = Depends(get_db_session),
 ):
-    """Get all variants awaiting approval."""
+    """Get all variants, optionally filtered by approval_status. Approved variants remain visible with their label."""
     try:
         import orchestration.db.models as _m
 
-        result = await session.execute(
-            select(_m.ResumeVariant)
-            .where(_m.ResumeVariant.approval_status == "pending")
-            .order_by(_m.ResumeVariant.created_at.desc())
-        )
+        query = select(_m.ResumeVariant).order_by(_m.ResumeVariant.created_at.desc())
+        if status:
+            query = query.where(_m.ResumeVariant.approval_status == status)
+
+        result = await session.execute(query)
         variants = result.scalars().all()
 
         return {
@@ -111,6 +112,11 @@ async def get_pending_variants(
                     "job_id": str(v.job_id),
                     "created_at": v.created_at.isoformat(),
                     "approval_token": v.approval_token,
+                    "approval_status": v.approval_status,
+                    "approved_at": v.approved_at.isoformat() if v.approved_at else None,
+                    "pdf_key": v.pdf_key or "",
+                    "docx_key": v.docx_key or "",
+                    "s3_upload_failed": bool(v.s3_upload_failed),
                 }
                 for v in variants
             ],
