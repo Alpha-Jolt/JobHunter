@@ -98,6 +98,10 @@ class PostgresVariantRepository(VariantRegistryBase):
             prompt_version=variant.prompt_version,
         )
         self._session.add(row)
+        # Flush immediately so the row is visible to subsequent UPDATE queries
+        # (including background tasks that open a new session) without waiting
+        # for the outer transaction commit (fixes race condition with _render_and_upload_async).
+        await self._session.flush()
 
     async def get(self, variant_id: uuid.UUID) -> VariantRecord:
         """Retrieve a variant by primary key.

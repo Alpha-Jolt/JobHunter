@@ -363,14 +363,16 @@ Return a JSON object containing an array of groups, each with a 'role_name', a l
                 variant_id = uuid.uuid4()
                 base_key = f"{user_id}/{job_uuid}"
                 
-                # Optionally trigger render for each
+                # Trigger background render/upload after save() flushes the row
                 if variant_obj and not optimised_variant.get("is_rejected"):
                     import asyncio
-                    asyncio.create_task(
+                    task = asyncio.create_task(
                         self._render_and_upload_async(
                             variant_id, base_key, variant_obj
                         )
                     )
+                    _background_tasks.add(task)
+                    task.add_done_callback(_background_tasks.discard)
                 
                 curated_json = optimised_variant.get("curated_json", {})
                 gaps = optimised_variant.get("gaps", [])
@@ -404,46 +406,80 @@ Return a JSON object containing an array of groups, each with a 'role_name', a l
                 await self.variant_registry.update_approval_token(variant_id, token)
 
     async def _render_and_upload_async(self, variant_id, base_key, variant_obj):
-        """Background task to generate and upload docx and pdf."""
+        """Background task: render DOCX/PDF and upload to MinIO, then UPDATE the DB row.
+
+        Fixes:
+        - Uses str(variant_id) in WHERE clause to match the VARCHAR column (UUID mismatch fix).
+        - Marks s3_upload_failed=True and stores local_pdf_path when MinIO upload fails.
+        - Logs storage errors at ERROR level so they are visible in monitoring.
+        """
         import tempfile
-        import os
         from pathlib import Path
         from ai_engine.features.output.renderers.resume_renderer import render_resume
-        
+        from ai_engine.core.logging_.logger import get_logger
+        from orchestration.db.connection import get_session_factory
+        import orchestration.db.models as _m
+        from sqlalchemy import update
+
+        logger = get_logger(__name__)
+        temp_dir = tempfile.mkdtemp()
+        # Use str(variant_id) — DB column is VARCHAR, not native UUID.
+        variant_id_str = str(variant_id)
+
         try:
-            temp_dir = tempfile.mkdtemp()
             out_dir = Path(temp_dir)
-            
             docx_path_str, pdf_path_str = await render_resume(variant_obj, out_dir)
-            
-            docx_key = await self.storage_service.upload_file(
-                docx_path_str,
-                f"variants/{base_key}/resume.docx",
-            )
-            
+
+            # --- Upload to MinIO ---
+            storage_failed = False
+            docx_key = ""
             pdf_key = ""
-            if pdf_path_str and Path(pdf_path_str).exists():
-                pdf_key = await self.storage_service.upload_file(
-                    pdf_path_str,
-                    f"variants/{base_key}/resume.pdf",
+            local_pdf_path = pdf_path_str or ""
+
+            try:
+                docx_key = await self.storage_service.upload_file(
+                    docx_path_str,
+                    f"variants/{base_key}/resume.docx",
                 )
-            
-            # Update VariantRecord with the docx_key and pdf_key
-            import orchestration.db.models as _m
-            from orchestration.db.connection import get_session_factory
-            from sqlalchemy import update
+                if pdf_path_str and Path(pdf_path_str).exists():
+                    pdf_key = await self.storage_service.upload_file(
+                        pdf_path_str,
+                        f"variants/{base_key}/resume.pdf",
+                    )
+            except Exception as upload_exc:
+                # MinIO is unreachable or misconfigured. Mark the variant so the
+                # frontend can surface a recoverable error instead of showing nothing.
+                storage_failed = True
+                logger.error(
+                    "minio_upload_failed",
+                    variant_id=variant_id_str,
+                    base_key=base_key,
+                    error=str(upload_exc),
+                )
+
+            # --- UPDATE the DB row in a new independent session ---
             async_session_maker = get_session_factory()
             async with async_session_maker() as session:
-                await session.execute(
+                update_values: dict = {
+                    "docx_key": docx_key,
+                    "pdf_key": pdf_key,
+                    "s3_upload_failed": storage_failed,
+                    "local_pdf_path": local_pdf_path if storage_failed else "",
+                }
+                result = await session.execute(
                     update(_m.ResumeVariant)
-                    .where(_m.ResumeVariant.variant_id == variant_id)
-                    .values(docx_key=docx_key, pdf_key=pdf_key)
+                    .where(_m.ResumeVariant.variant_id == variant_id_str)
+                    .values(**update_values)
                 )
                 await session.commit()
+                if result.rowcount == 0:
+                    logger.error(
+                        "render_upload_update_missed",
+                        variant_id=variant_id_str,
+                        detail="UPDATE matched 0 rows",
+                    )
         except Exception as exc:
-            from ai_engine.core.logging_.logger import get_logger
-            logger = get_logger(__name__)
-            logger.error("async_render_failed", variant_id=str(variant_id), error=str(exc))
+            logger.error("async_render_failed", variant_id=variant_id_str, error=str(exc))
         finally:
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)

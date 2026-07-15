@@ -40,12 +40,14 @@ class StorageService:
             
         if self.s3_client and self.bucket_name:
             def _upload():
+                # Ensure bucket exists before uploading
                 try:
                     self.s3_client.head_bucket(Bucket=self.bucket_name)
                 except Exception:
                     self.s3_client.create_bucket(Bucket=self.bucket_name)
+                # Let boto3 exceptions propagate so callers can handle storage failures
                 self.s3_client.upload_file(str(src), self.bucket_name, destination_key)
-                
+
             await asyncio.get_event_loop().run_in_executor(None, _upload)
             return destination_key
         else:
