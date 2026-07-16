@@ -64,8 +64,6 @@ services:
       - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
       - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - grafana_data:/var/lib/grafana
-    ports:
-      - "4000:3000" # Grafana HTTP
     networks:
       - default
 

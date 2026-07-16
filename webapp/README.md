@@ -12,10 +12,11 @@ Next.js 15 frontend for the JobHunter platform. Serves as the primary user inter
 ```bash
 cd webapp/
 cp .env.example .env.local
-# Set NEXT_PUBLIC_API_BASE_URL to your orchestration API (default: http://localhost:8000)
+# Nginx (Docker): https://myjobhunter.in
+# Set NEXT_PUBLIC_API_BASE_URL to your orchestration API (default: https://api.myjobhunter.in)
 
-npm install
-npm run dev       # Development server → http://localhost:3000
+npm install       # Install dependencies
+npm run dev       # Development server
 npm run build     # Production build (standalone)
 npm run start     # Serve production build
 npm run typecheck # TypeScript strict check
@@ -29,7 +30,7 @@ npm run lint      # ESLint
 ```bash
 # Build
 docker build \
-  --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.myjobhunter.in \
   -t jobhunter-webapp .
 
 # Run
@@ -86,8 +87,8 @@ webapp/
 
 | Variable | Default | Description |
 |---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` | Orchestration API base URL |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | Frontend base URL |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://api.myjobhunter.in` | Orchestration API base URL |
+| `NEXT_PUBLIC_APP_URL` | `https://myjobhunter.in` | Frontend base URL |
 
 ---
 

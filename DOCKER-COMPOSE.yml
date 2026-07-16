@@ -47,8 +47,6 @@ services:
     container_name: jobhunter-admin
     environment:
       NEXT_PUBLIC_ADMIN_API_URL: http://admin-api:8003
-    ports:
-      - "5001:3001"
     depends_on:
       - admin-api
     networks:
@@ -63,8 +61,6 @@ services:
       - ./admin_api/.env
     volumes:
       - ./scraper/logs:/scraper/logs
-    ports:
-      - "8003:8003"
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,8 +112,6 @@ services:
       MAIL_BRIDGE_URL: http://mail-bridge:3000
       MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-    ports:
-      - "8000:8000"
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 10s
@@ -139,8 +133,6 @@ services:
     container_name: jobhunter-webapp
     environment:
       INTERNAL_API_URL: http://jobhunter-api:8000
-    ports:
-      - "3000:3000"
     depends_on:
       jobhunter-api:
         condition: service_healthy

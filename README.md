@@ -125,6 +125,7 @@ JobHunter is built with a zero-tolerance approach to fraud and abuse:
 | Module 2 — Career Page Job Scraper | ✅ Complete |
 | Orchestration API — Company Discovery & Career Jobs routes | ✅ Complete |
 | Admin Dashboard — Company Discovery & Career Jobs UI | ✅ Complete |
+| Nginx API Gateway (Cloudflare Zero Trust) | ✅ Complete |
 
 ---
 
