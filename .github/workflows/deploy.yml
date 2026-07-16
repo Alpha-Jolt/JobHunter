@@ -1,0 +1,153 @@
+name: Deploy JobHunter to Production VPS
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Typecheck & build webapp
+        working-directory: webapp
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.myjobhunter.in
+          NEXT_PUBLIC_APP_URL: https://app.myjobhunter.in
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+  deploy:
+    name: Deploy to Production VPS
+    needs: test
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.HOST_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 30m
+          script: |
+            set -e
+
+            # Navigate to project (must be a git clone)
+            cd /docker/JobHunter
+
+            if [ ! -d .git ]; then
+              echo "ERROR: /docker/JobHunter is not a git repo."
+              echo "On the VPS run once:"
+              echo "  cd /docker && git clone -b develop https://github.com/Alpha-Jolt/JobHunter.git JobHunter"
+              exit 1
+            fi
+
+            # ── Pull latest develop ─────────────────────────────────────────
+            git fetch origin develop
+            git checkout develop
+            git pull origin develop
+
+            # ── Root .env (compose variable substitution) ───────────────────
+            {
+              echo "MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}"
+              echo "NEXT_PUBLIC_API_BASE_URL=https://api.myjobhunter.in"
+              echo "NEXT_PUBLIC_APP_URL=https://app.myjobhunter.in"
+              echo "NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.myjobhunter.in"
+            } > .env
+
+            # ── scraper/.env ────────────────────────────────────────────────
+            {
+              echo "DEV_MODE=false"
+              echo "HEADLESS=true"
+              echo "PAGES_PER_SEARCH=${{ secrets.SCRAPER_PAGES_PER_SEARCH }}"
+              echo "INDEED_RATE_LIMIT=1.0"
+              echo "NAUKRI_RATE_LIMIT=0.5"
+              echo "OUTPUT_FORMATS=json,csv"
+              echo "USE_REGISTRY=true"
+              echo "REGISTRY_PATH=../registries/jobs.json"
+              echo "LOG_LEVEL=INFO"
+              echo "JSEARCH_API_KEY=${{ secrets.JSEARCH_API_KEY }}"
+              echo "PROXY_LIST=${{ secrets.PROXY_LIST }}"
+            } > scraper/.env
+
+            # ── orchestration/.env ──────────────────────────────────────────
+            {
+              echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
+              echo "API_HOST=0.0.0.0"
+              echo "API_PORT=8000"
+              echo "LOG_LEVEL=INFO"
+              echo "SECRET_KEY_APPROVAL=${{ secrets.SECRET_KEY_APPROVAL }}"
+              echo "APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}"
+              echo "MAX_APPLICATIONS_PER_DAY=10"
+              echo "MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}"
+            } > orchestration/.env
+
+            # ── ai_engine/.env ──────────────────────────────────────────────
+            {
+              echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}"
+              echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}"
+              echo "OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}"
+              echo "OPENROUTER_MODEL=${{ secrets.OPENROUTER_MODEL }}"
+              echo "LLM_PRIMARY_PROVIDER=${{ secrets.LLM_PRIMARY_PROVIDER }}"
+              echo "LLM_MAX_RETRIES=3"
+              echo "LLM_TIMEOUT_SECONDS=60"
+              echo "MAX_VARIANTS_TOTAL=50"
+              echo "MAX_VARIANTS_PER_SESSION=10"
+              echo "PATH_SCRAPER_OUTPUT_DIR=output/final"
+              echo "PATH_AI_OUTPUT_DIR=ai_output"
+              echo "LOG_LEVEL=INFO"
+              echo "APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}"
+              echo "USE_SHARED_REGISTRY=true"
+              echo "SHARED_JOBS_REGISTRY_PATH=../registries/jobs.json"
+              echo "SHARED_VARIANTS_REGISTRY_PATH=../registries/variants.json"
+              echo "MINIO_ENDPOINT=jobhunter-minio:9000"
+              echo "MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}"
+              echo "MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}"
+              echo "MINIO_BUCKET_NAME=jobhunter-resumes"
+              echo "MINIO_ENABLED=true"
+            } > ai_engine/.env
+
+            # ── admin_api/.env ──────────────────────────────────────────────
+            {
+              echo "DATABASE_URL=${{ secrets.DATABASE_URL }}"
+              echo "LOG_LEVEL=INFO"
+              echo "API_KEY=${{ secrets.ADMIN_API_KEY }}"
+            } > admin_api/.env
+
+            # ── Rebuild & start (prod port map: webapp→3003, api→8004) ──────
+            docker compose -p jobhunter \
+              -f DOCKER-COMPOSE.yml \
+              -f DOCKER-COMPOSE.prod.yml \
+              up -d --build --remove-orphans
+
+            # ── Migrations ──────────────────────────────────────────────────
+            sleep 15
+            docker compose -p jobhunter \
+              -f DOCKER-COMPOSE.yml \
+              -f DOCKER-COMPOSE.prod.yml \
+              exec -T jobhunter-api alembic upgrade head || true
+
+            # ── MinIO bucket (host port 9010 in prod) ───────────────────────
+            if [ -f scripts/setup_minio.sh ]; then
+              MINIO_ENDPOINT=localhost:9010 bash scripts/setup_minio.sh || true
+            fi
+
+            docker image prune -f
+
+            echo "JobHunter deployed → https://app.myjobhunter.in (port 3003)"

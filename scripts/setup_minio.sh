@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-MINIO_ENDPOINT="localhost:9000"
-MINIO_USER="minioadmin"
-MINIO_PASS="minioadmin"
-BUCKET_NAME="jobhunter-resumes"
+MINIO_ENDPOINT="${MINIO_ENDPOINT:-localhost:9000}"
+MINIO_USER="${MINIO_USER:-minioadmin}"
+MINIO_PASS="${MINIO_PASS:-minioadmin}"
+BUCKET_NAME="${BUCKET_NAME:-jobhunter-resumes}"
 
 echo "Waiting for MinIO to be ready..."
 until curl -sf "http://$MINIO_ENDPOINT/minio/health/live" > /dev/null 2>&1; do
