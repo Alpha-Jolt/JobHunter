@@ -85,10 +85,49 @@ class DatabaseOutput(BaseOutput):
                 }
             )
             await session.execute(stmt)
+            await self._upsert_companies_from_jobs(session, jobs)
             await session.commit()
             
         logger.info("DatabaseOutput saved %d jobs", len(records))
         return len(records)
+
+    async def _upsert_companies_from_jobs(self, session, jobs: List[CanonicalJob]) -> None:
+        """Upserts stub companies for new jobs that have a company domain."""
+        from sqlalchemy import text
+        import hashlib
+        import uuid
+        
+        for job in jobs:
+            if not job.company_domain:
+                continue
+                
+            domain = job.company_domain.lower().replace("www.", "").rstrip("/")
+            dedup = hashlib.sha256(domain.encode("utf-8")).hexdigest()
+            normalized_name = job.company_name.lower().strip() if job.company_name else None
+            
+            # Using 'name_only' if we just have a name but here we have a domain so 'pending'
+            stmt = text("""
+                INSERT INTO companies (
+                    company_id, company_name, normalized_name, apex_domain,
+                    subdomains, career_emails, contact_emails, email_trust,
+                    ats_platform, source, source_detail, robots_txt_allowed,
+                    crawl_status, dedup_fingerprint, discovery_date, is_generated
+                ) VALUES (
+                    :company_id, :company_name, :normalized_name, :apex_domain,
+                    '{}', '{}', '{}', 'unverified',
+                    'none', 'search_discovery', :source_detail, NULL,
+                    'pending', :dedup, now(), false
+                )
+                ON CONFLICT (apex_domain) DO NOTHING
+            """)
+            await session.execute(stmt, {
+                "company_id": str(uuid.uuid4()),
+                "company_name": job.company_name,
+                "normalized_name": normalized_name,
+                "apex_domain": domain,
+                "source_detail": f"{job.source}_feed",
+                "dedup": dedup,
+            })
 
     async def read(self) -> List[CanonicalJob]:
         """Not implemented — scraper does not read from DB."""

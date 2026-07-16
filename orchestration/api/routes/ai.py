@@ -202,13 +202,26 @@ async def get_raw_jobs(
     jobs = await job_repo.get_by_status("raw")
     return {"jobs": jobs}
 
-@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
+@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK)
 async def generate_variant(
     body: GenerateVariantRequest,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> GenerateVariantResponse:
     """Generate a tailored resume variant for a job."""
+    # Ownership: user_id in body must match the authenticated user.
+    # Admins may generate on behalf of any user.
+    if current_user.role != "admin" and body.user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot generate variant for another user.")
+
+    # Resume ownership: S3 key must be scoped to the requesting user.
+    expected_prefix = f"resumes/{body.user_id}/"
+    if not body.resume_file_path.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=403,
+            detail="Resume file does not belong to the specified user.",
+        )
+
     ai_service = _get_ai_service(session)
     job_repo = PostgresJobRepository(session)
 
@@ -287,13 +300,24 @@ async def generate_variant(
     )
 
 
-@router.post("/bulk-generate", status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
+@router.post("/bulk-generate", status_code=status.HTTP_200_OK)
 async def bulk_generate_variants(
     body: BulkGenerateVariantRequest,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ):
     """Generate tailored resume variants for multiple jobs using SSE for progress."""
+    # Ownership checks
+    if current_user.role != "admin" and body.user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot generate variants for another user.")
+
+    expected_prefix = f"resumes/{body.user_id}/"
+    if not body.resume_file_path.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=403,
+            detail="Resume file does not belong to the specified user.",
+        )
+
     if not body.job_ids:
         raise HTTPException(status_code=400, detail="job_ids cannot be empty")
     
@@ -307,50 +331,51 @@ async def bulk_generate_variants(
         await queue.put(f"data: {{\"status\": \"Processing\", \"message\": \"{message}\"}}\n\n")
 
     async def run_bulk():
+        # IMPORTANT: This runs as a detached background task after the route's
+        # session dependency has been torn down. Must open its own session.
+        from orchestration.db.connection import get_session_factory
+        temp_dir = tempfile.mkdtemp(dir=os.getcwd())
         try:
-            ai_service = _get_ai_service(session)
-            
-            # Download resume from MinIO
-            settings = get_settings()
-            scheme = "https" if settings.minio.minio_secure else "http"
-            s3_client = boto3.client(
-                "s3",
-                endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
-                aws_access_key_id=settings.minio.minio_access_key,
-                aws_secret_access_key=settings.minio.minio_secret_key,
-                region_name="us-east-1",
-            )
-            bucket_name = settings.minio.minio_bucket
-            s3_key = body.resume_file_path
-        
-            file_name = Path(s3_key).name
-            temp_dir = tempfile.mkdtemp(dir=os.getcwd())
-            local_resume_path = os.path.join(temp_dir, file_name)
-        
-            def _download_from_minio():
-                s3_client.download_file(bucket_name, s3_key, local_resume_path)
-        
-            await asyncio.get_event_loop().run_in_executor(None, _download_from_minio)
+            async_session_maker = get_session_factory()
+            async with async_session_maker() as bulk_session:
+                ai_service = _get_ai_service(bulk_session)
 
-            # Call real bulk processing
-            await ai_service.bulk_process_jobs(
-                user_id=body.user_id,
-                job_ids=body.job_ids,
-                master_resume_path=local_resume_path,
-                yield_progress=yield_progress
-            )
-            
+                settings = get_settings()
+                scheme = "https" if settings.minio.minio_secure else "http"
+                s3_client = boto3.client(
+                    "s3",
+                    endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+                    aws_access_key_id=settings.minio.minio_access_key,
+                    aws_secret_access_key=settings.minio.minio_secret_key,
+                    region_name="us-east-1",
+                )
+                bucket_name = settings.minio.minio_bucket
+                s3_key = body.resume_file_path
+
+                file_name = Path(s3_key).name
+                local_resume_path = os.path.join(temp_dir, file_name)
+
+                def _download_from_minio():
+                    s3_client.download_file(bucket_name, s3_key, local_resume_path)
+
+                await asyncio.get_event_loop().run_in_executor(None, _download_from_minio)
+
+                await ai_service.bulk_process_jobs(
+                    user_id=body.user_id,
+                    job_ids=body.job_ids,
+                    master_resume_path=local_resume_path,
+                    yield_progress=yield_progress,
+                )
+                await bulk_session.commit()
+
             await queue.put("data: {\"status\": \"Success\", \"message\": \"Bulk variant generation completed.\"}\n\n")
         except Exception as e:
             import traceback
             traceback.print_exc()
-            await queue.put(f"data: {{\"status\": \"Error\", \"message\": \"Error: {e}\"}}\n\n")
+            await queue.put(f'data: {{"status": "Error", "message": "Error: {str(e)}"}}' + "\n\n")
         finally:
-            await queue.put(None) # Signal end of stream
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception:
-                pass
+            await queue.put(None)  # Signal end of stream
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     # Start the background task
     asyncio.create_task(run_bulk())
@@ -373,11 +398,16 @@ async def bulk_generate_variants(
 )
 async def get_pending_variants(
     user_id: str,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> PendingVariantsResponse:
     """List all pending variants awaiting approval for a user."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id must not be empty")
+
+    # Ownership: hunters may only query their own variants.
+    if current_user.role != "admin" and user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot access another user's variants.")
 
     try:
         user_uuid = uuid.UUID(user_id)
@@ -423,10 +453,10 @@ async def get_pending_variants(
     "/variants/{user_id}",
     response_model=AllVariantsResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
 )
 async def get_all_variants(
     user_id: str,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> AllVariantsResponse:
     """List all variants for a user across all statuses (pending/approved/rejected).
@@ -436,6 +466,10 @@ async def get_all_variants(
     """
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id must not be empty")
+
+    # Ownership: hunters may only access their own variants.
+    if current_user.role != "admin" and user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot access another user's variants.")
 
     variant_repo = PostgresVariantRepository(session)
     job_repo = PostgresJobRepository(session)

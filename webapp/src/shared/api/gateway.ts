@@ -53,7 +53,9 @@ export const authApi = {
 export const jobsApi = {
   list: (params?: { source?: string; limit?: number; offset?: number; search?: string }) =>
     client
-      .get<{ jobs: JobRecord[]; total?: number }>("/api/scraper/latest-jobs", { params })
+      .get<{ jobs: JobRecord[]; total?: number }>("/api/scraper/latest-jobs", { 
+        params: { ...params, include_career_jobs: true } 
+      })
       .then((r) => r.data),
 
   counts: () =>
