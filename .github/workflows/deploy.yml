@@ -3,7 +3,7 @@ name: Deploy JobHunter to Production VPS
 on:
   push:
     branches:
-      - develop
+      - feature/develop
   workflow_dispatch:
 
 jobs:
@@ -54,14 +54,14 @@ jobs:
             if [ ! -d .git ]; then
               echo "ERROR: /docker/JobHunter is not a git repo."
               echo "On the VPS run once:"
-              echo "  cd /docker && git clone -b develop https://github.com/Alpha-Jolt/JobHunter.git JobHunter"
+              echo "  cd /docker && git clone -b feature/develop https://github.com/Alpha-Jolt/JobHunter.git JobHunter"
               exit 1
             fi
 
-            # ── Pull latest develop ─────────────────────────────────────────
-            git fetch origin develop
-            git checkout develop
-            git pull origin develop
+            # ── Pull latest feature/develop ─────────────────────────────────
+            git fetch origin feature/develop
+            git checkout feature/develop
+            git pull origin feature/develop
 
             # ── Root .env (compose variable substitution) ───────────────────
             {
