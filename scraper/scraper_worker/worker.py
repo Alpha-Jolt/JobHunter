@@ -6,7 +6,7 @@ from dev_mode.dev_runner import DevModeRunner
 from scraper.db.connection import init_db, get_session
 from scraper.config import config
 import redis.asyncio as redis
-
+from sqlalchemy import text
 logging.basicConfig(level=config.log_level)
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,10 @@ async def _handle_company_discovery_bootstrap(
         rate_limiter = RateLimiter()
         retry_handler = RetryHandler()
         robots_checker = RobotsChecker()
-        pipeline = EnrichmentPipeline(robots_checker=robots_checker)
+        async with get_session() as session:
+            result = await session.execute(text("SELECT apex_domain FROM companies"))
+            existing_domains = {row[0] for row in result.fetchall()}
+        pipeline = EnrichmentPipeline(robots_checker=robots_checker, known_domains=existing_domains)
 
         all_domains = []
         sources = payload.get("sources", ["all"])
@@ -185,7 +188,10 @@ async def _handle_search_discovery(
         rate_limiter = RateLimiter()
         retry_handler = RetryHandler()
         robots_checker = RobotsChecker()
-        pipeline = EnrichmentPipeline(robots_checker=robots_checker)
+        async with get_session() as session:
+            result = await session.execute(text("SELECT apex_domain FROM companies"))
+            existing_domains = {row[0] for row in result.fetchall()}
+        pipeline = EnrichmentPipeline(robots_checker=robots_checker, known_domains=existing_domains)
 
         searcher = SearchDiscovery(rate_limiter=rate_limiter, retry_handler=retry_handler)
         domains = await searcher.discover(

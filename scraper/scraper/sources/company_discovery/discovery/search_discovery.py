@@ -110,8 +110,7 @@ class SearchDiscovery(BaseCompanySource):
             timeout=_HTTP_TIMEOUT,
             follow_redirects=True,
             headers={
-                "User-Agent": "Mozilla/5.0 (compatible; JobHunterBot/1.0)",
-                "Accept-Language": "en-US,en;q=0.9",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 (compatible; JobHunterBot/1.0)",
             },
         ) as client:
             for query in queries:
