@@ -145,12 +145,16 @@ jobs:
             # ── Mail-Bridge ──────────────────────────────────────────────────
             # MB_ prefix used in GitHub secrets to avoid name clashes with JobHunter vars.
             # Stripped here when writing the actual .env file Mail-Bridge expects.
+            MB_DB="${{ secrets.MB_POSTGRES_DB }}"
+            MB_USER="${{ secrets.MB_POSTGRES_USER }}"
+            MB_PASS="${{ secrets.MB_POSTGRES_PASSWORD }}"
+
             cat > /docker/JobHunter/mailbridge/.env <<EOF
             NODE_ENV=production
-            POSTGRES_DB=${{ secrets.MB_POSTGRES_DB }}
-            POSTGRES_USER=${{ secrets.MB_POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.MB_POSTGRES_PASSWORD }}
-            DATABASE_URL=postgresql://${{ secrets.MB_POSTGRES_USER }}:${{ secrets.MB_POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.MB_POSTGRES_DB }}
+            POSTGRES_DB=${MB_DB:-mailbridge}
+            POSTGRES_USER=${MB_USER:-mailbridge}
+            POSTGRES_PASSWORD=${MB_PASS:-mailbridge}
+            DATABASE_URL=postgresql://${MB_USER:-mailbridge}:${MB_PASS:-mailbridge}@postgres:5432/${MB_DB:-mailbridge}
             REDIS_URL=redis://redis:6379
             JWT_SECRET=${{ secrets.MB_JWT_SECRET }}
             JWT_EXPIRES_IN=24h
