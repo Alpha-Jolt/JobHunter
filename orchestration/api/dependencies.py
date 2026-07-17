@@ -55,10 +55,16 @@ def get_internal_s3_client(settings: Settings = Depends(get_settings)):
 
 
 def get_external_s3_client(settings: Settings = Depends(get_settings)):
-    scheme = "https" if settings.minio.minio_secure else "http"
-    endpoint = settings.minio.minio_endpoint
-    if endpoint.startswith("minio:"):
-        endpoint = endpoint.replace("minio:", "localhost:")
+    if settings.minio.minio_external_endpoint:
+        endpoint = settings.minio.minio_external_endpoint
+        secure = settings.minio.minio_external_secure if settings.minio.minio_external_secure is not None else settings.minio.minio_secure
+        scheme = "https" if secure else "http"
+    else:
+        scheme = "https" if settings.minio.minio_secure else "http"
+        endpoint = settings.minio.minio_endpoint
+        if endpoint.startswith("minio:"):
+            endpoint = endpoint.replace("minio:", "localhost:")
+            
     endpoint_url = f"{scheme}://{endpoint}"
     return _get_cached_s3_client(endpoint_url, settings.minio.minio_access_key, settings.minio.minio_secret_key)
 

@@ -103,6 +103,8 @@ class MinIOConfig(BaseSettings):
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
     minio_avatar_bucket: str = Field(default="jobhunter-avatars", alias="MINIO_AVATAR_BUCKET_NAME")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
+    minio_external_endpoint: str | None = Field(default=None, alias="MINIO_EXTERNAL_ENDPOINT")
+    minio_external_secure: bool | None = Field(default=None, alias="MINIO_EXTERNAL_SECURE")
 
 class RedisConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
