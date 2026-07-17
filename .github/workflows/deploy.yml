@@ -120,6 +120,10 @@ jobs:
             INTERNAL_API_URL=http://jobhunter-api:8000
             NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.myjobhunter.in
             ADMIN_API_INTERNAL_URL=http://admin-api:8003
+            SECRET_KEY=${{ secrets.ADMIN_API_SECRET_KEY }}
+            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+            ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
+            POSTGRES_URL=${{ secrets.DATABASE_URL }}
             EOF
 
             # Rebuild & start JobHunter stack
