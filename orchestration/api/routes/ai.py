@@ -137,6 +137,26 @@ class PendingVariantsResponse(BaseModel):
     pending: list[VariantSummary]
 
 
+class VariantSummaryFull(BaseModel):
+    variant_id: str
+    job_id: str
+    job_title: str
+    company_name: str
+    match_score: float
+    approval_status: str
+    created_at: Optional[str]
+    approved_at: Optional[str]
+    approval_link: str
+    pdf_key: str
+    docx_key: str
+    s3_upload_failed: bool
+
+
+class AllVariantsResponse(BaseModel):
+    total: int
+    variants: list[VariantSummaryFull]
+
+
 class PreviewVariantResponse(BaseModel):
     variant_id: str
     approval_status: str
@@ -182,13 +202,26 @@ async def get_raw_jobs(
     jobs = await job_repo.get_by_status("raw")
     return {"jobs": jobs}
 
-@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
+@router.post("/generate", response_model=GenerateVariantResponse, status_code=status.HTTP_200_OK)
 async def generate_variant(
     body: GenerateVariantRequest,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> GenerateVariantResponse:
     """Generate a tailored resume variant for a job."""
+    # Ownership: user_id in body must match the authenticated user.
+    # Admins may generate on behalf of any user.
+    if current_user.role != "admin" and body.user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot generate variant for another user.")
+
+    # Resume ownership: S3 key must be scoped to the requesting user.
+    expected_prefix = f"resumes/{body.user_id}/"
+    if not body.resume_file_path.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=403,
+            detail="Resume file does not belong to the specified user.",
+        )
+
     ai_service = _get_ai_service(session)
     job_repo = PostgresJobRepository(session)
 
@@ -267,13 +300,24 @@ async def generate_variant(
     )
 
 
-@router.post("/bulk-generate", status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))])
+@router.post("/bulk-generate", status_code=status.HTTP_200_OK)
 async def bulk_generate_variants(
     body: BulkGenerateVariantRequest,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ):
     """Generate tailored resume variants for multiple jobs using SSE for progress."""
+    # Ownership checks
+    if current_user.role != "admin" and body.user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot generate variants for another user.")
+
+    expected_prefix = f"resumes/{body.user_id}/"
+    if not body.resume_file_path.startswith(expected_prefix):
+        raise HTTPException(
+            status_code=403,
+            detail="Resume file does not belong to the specified user.",
+        )
+
     if not body.job_ids:
         raise HTTPException(status_code=400, detail="job_ids cannot be empty")
     
@@ -287,50 +331,51 @@ async def bulk_generate_variants(
         await queue.put(f"data: {{\"status\": \"Processing\", \"message\": \"{message}\"}}\n\n")
 
     async def run_bulk():
+        # IMPORTANT: This runs as a detached background task after the route's
+        # session dependency has been torn down. Must open its own session.
+        from orchestration.db.connection import get_session_factory
+        temp_dir = tempfile.mkdtemp(dir=os.getcwd())
         try:
-            ai_service = _get_ai_service(session)
-            
-            # Download resume from MinIO
-            settings = get_settings()
-            scheme = "https" if settings.minio.minio_secure else "http"
-            s3_client = boto3.client(
-                "s3",
-                endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
-                aws_access_key_id=settings.minio.minio_access_key,
-                aws_secret_access_key=settings.minio.minio_secret_key,
-                region_name="us-east-1",
-            )
-            bucket_name = settings.minio.minio_bucket
-            s3_key = body.resume_file_path
-        
-            file_name = Path(s3_key).name
-            temp_dir = tempfile.mkdtemp(dir=os.getcwd())
-            local_resume_path = os.path.join(temp_dir, file_name)
-        
-            def _download_from_minio():
-                s3_client.download_file(bucket_name, s3_key, local_resume_path)
-        
-            await asyncio.get_event_loop().run_in_executor(None, _download_from_minio)
+            async_session_maker = get_session_factory()
+            async with async_session_maker() as bulk_session:
+                ai_service = _get_ai_service(bulk_session)
 
-            # Call real bulk processing
-            await ai_service.bulk_process_jobs(
-                user_id=body.user_id,
-                job_ids=body.job_ids,
-                master_resume_path=local_resume_path,
-                yield_progress=yield_progress
-            )
-            
+                settings = get_settings()
+                scheme = "https" if settings.minio.minio_secure else "http"
+                s3_client = boto3.client(
+                    "s3",
+                    endpoint_url=f"{scheme}://{settings.minio.minio_endpoint}",
+                    aws_access_key_id=settings.minio.minio_access_key,
+                    aws_secret_access_key=settings.minio.minio_secret_key,
+                    region_name="us-east-1",
+                )
+                bucket_name = settings.minio.minio_bucket
+                s3_key = body.resume_file_path
+
+                file_name = Path(s3_key).name
+                local_resume_path = os.path.join(temp_dir, file_name)
+
+                def _download_from_minio():
+                    s3_client.download_file(bucket_name, s3_key, local_resume_path)
+
+                await asyncio.get_event_loop().run_in_executor(None, _download_from_minio)
+
+                await ai_service.bulk_process_jobs(
+                    user_id=body.user_id,
+                    job_ids=body.job_ids,
+                    master_resume_path=local_resume_path,
+                    yield_progress=yield_progress,
+                )
+                await bulk_session.commit()
+
             await queue.put("data: {\"status\": \"Success\", \"message\": \"Bulk variant generation completed.\"}\n\n")
         except Exception as e:
             import traceback
             traceback.print_exc()
-            await queue.put(f"data: {{\"status\": \"Error\", \"message\": \"Error: {e}\"}}\n\n")
+            await queue.put(f'data: {{"status": "Error", "message": "Error: {str(e)}"}}' + "\n\n")
         finally:
-            await queue.put(None) # Signal end of stream
-            try:
-                shutil.rmtree(temp_dir, ignore_errors=True)
-            except Exception:
-                pass
+            await queue.put(None)  # Signal end of stream
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     # Start the background task
     asyncio.create_task(run_bulk())
@@ -353,11 +398,16 @@ async def bulk_generate_variants(
 )
 async def get_pending_variants(
     user_id: str,
+    current_user: UserRecord = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session),
 ) -> PendingVariantsResponse:
     """List all pending variants awaiting approval for a user."""
     if not user_id:
         raise HTTPException(status_code=400, detail="user_id must not be empty")
+
+    # Ownership: hunters may only query their own variants.
+    if current_user.role != "admin" and user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot access another user's variants.")
 
     try:
         user_uuid = uuid.UUID(user_id)
@@ -397,6 +447,72 @@ async def get_pending_variants(
         )
 
     return PendingVariantsResponse(total=len(summaries), pending=summaries)
+
+
+@router.get(
+    "/variants/{user_id}",
+    response_model=AllVariantsResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def get_all_variants(
+    user_id: str,
+    current_user: UserRecord = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> AllVariantsResponse:
+    """List all variants for a user across all statuses (pending/approved/rejected).
+
+    Approved variants remain visible with approval_status='approved' so users
+    can review, download, or track their history.
+    """
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id must not be empty")
+
+    # Ownership: hunters may only access their own variants.
+    if current_user.role != "admin" and user_id != str(current_user.user_id):
+        raise HTTPException(status_code=403, detail="Cannot access another user's variants.")
+
+    variant_repo = PostgresVariantRepository(session)
+    job_repo = PostgresJobRepository(session)
+    variants = await variant_repo.get_for_user(user_id)
+
+    base_url = "http://localhost:8000"
+    summaries = []
+    for v in variants:
+        curated = dict(v.curated_json or {})
+        match_score = float(curated.get("match_score", 0))
+        job_title = ""
+        company_name = ""
+        try:
+            job = await job_repo.get(v.job_id)
+            job_title = getattr(job, "title", "")
+            company_name = getattr(job, "company_name", "")
+        except Exception:
+            pass
+
+        summaries.append(
+            VariantSummaryFull(
+                variant_id=str(v.variant_id),
+                job_id=str(v.job_id),
+                job_title=job_title,
+                company_name=company_name,
+                match_score=match_score,
+                approval_status=v.approval_status,
+                created_at=v.created_at.isoformat() if v.created_at else None,
+                approved_at=v.approved_at.isoformat() if v.approved_at else None,
+                approval_link=_make_approval_link(
+                    base_url, str(v.variant_id), v.approval_token or ""
+                ),
+                pdf_key=v.pdf_key or "",
+                docx_key=v.docx_key or "",
+                s3_upload_failed=bool(v.s3_upload_failed),
+            )
+        )
+
+    # Sort: pending first, then approved, then rejected — newest first within each group
+    order = {"pending": 0, "approved": 1, "rejected": 2}
+    summaries.sort(key=lambda x: (order.get(x.approval_status, 9), x.created_at or ""), reverse=False)
+
+    return AllVariantsResponse(total=len(summaries), variants=summaries)
 
 
 @router.get(
@@ -474,6 +590,50 @@ async def download_variant(
         ExpiresIn=3600
     )
     return RedirectResponse(url=url)
+
+
+@router.get(
+    "/pdf-preview/{variant_id}",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_role(RoleEnum.HUNTER, RoleEnum.ADMIN))],
+)
+async def pdf_preview(
+    variant_id: str,
+    session: AsyncSession = Depends(get_db_session),
+    s3_client=Depends(get_external_s3_client),
+):
+    """Return a presigned URL for inline PDF preview (opens in browser, not download)."""
+    try:
+        vid = uuid.UUID(variant_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid variant_id")
+
+    variant_repo = PostgresVariantRepository(session)
+    try:
+        variant = await variant_repo.get(vid)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    settings = get_settings()
+    file_key = variant.pdf_key
+    if not file_key:
+        # Fall back to docx if pdf not generated
+        raise HTTPException(
+            status_code=404,
+            detail="PDF not yet generated for this variant. Try again shortly or download the DOCX.",
+        )
+
+    url = s3_client.generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": settings.minio.minio_bucket,
+            "Key": file_key,
+            "ResponseContentType": "application/pdf",
+            "ResponseContentDisposition": "inline",
+        },
+        ExpiresIn=3600,
+    )
+    return {"url": url, "variant_id": variant_id, "expires_in": 3600}
 
 
 @router.get(

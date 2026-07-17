@@ -84,33 +84,112 @@ class ScraperService:
 
     async def get_latest_jobs(
         self, source: Optional[str] = None, limit: int = 20, offset: int = 0, search: Optional[str] = None,
+        include_career_jobs: bool = False
     ) -> tuple[List[JobRecord], int]:
         """Return active jobs ordered by last_seen_at DESC, and total count."""
         Job = _db_models.Job
+        CareerJob = _db_models.CareerJob
+        Company = _db_models.Company
         
-        # Base query for filtering
-        base_stmt = select(Job).where(Job.status != "closed")
-        if source:
-            base_stmt = base_stmt.where(Job.source == source)
+        from sqlalchemy import union_all, literal_column, cast, String, Numeric
+        
+        j_stmt = select(
+            Job.job_id.label("job_id"),
+            Job.source.label("source"),
+            Job.external_id.label("external_id"),
+            Job.title.label("title"),
+            Job.company_name.label("company_name"),
+            Job.company_domain.label("company_domain"),
+            Job.location.label("location"),
+            Job.remote_type.label("remote_type"),
+            Job.salary_min.label("salary_min"),
+            Job.salary_max.label("salary_max"),
+            Job.experience_min.label("experience_min"),
+            Job.experience_max.label("experience_max"),
+            Job.description.label("description"),
+            Job.skills_required.label("skills_required"),
+            Job.job_type.label("job_type"),
+            Job.apply_email.label("apply_email"),
+            Job.email_trust.label("email_trust"),
+            Job.apply_url.label("apply_url"),
+            Job.posted_at.label("posted_at"),
+            Job.scraped_at.label("scraped_at"),
+            Job.last_seen_at.label("last_seen_at"),
+            Job.status.label("status")
+        ).where(Job.status != "closed")
+
+        if source and source != "career_page":
+            j_stmt = j_stmt.where(Job.source == source)
+        elif source == "career_page":
+            j_stmt = j_stmt.where(literal_column("1") == literal_column("0"))
+            
         if search:
             from sqlalchemy import or_
             search_term = f"%{search}%"
-            base_stmt = base_stmt.where(
+            j_stmt = j_stmt.where(
                 or_(
                     Job.title.ilike(search_term),
                     Job.company_name.ilike(search_term),
                     Job.description.ilike(search_term)
                 )
             )
-            
-        # Get total count
-        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+
+        stmts = [j_stmt]
+
+        if include_career_jobs:
+            cj_stmt = select(
+                CareerJob.career_job_id.label("job_id"),
+                CareerJob.source_channel.label("source"),
+                cast(literal_column("''"), String(255)).label("external_id"),
+                CareerJob.job_title.label("title"),
+                Company.company_name.label("company_name"),
+                Company.apex_domain.label("company_domain"),
+                CareerJob.location.label("location"),
+                CareerJob.remote_type.label("remote_type"),
+                cast(CareerJob.salary_min, Numeric(12, 2)).label("salary_min"),
+                cast(CareerJob.salary_max, Numeric(12, 2)).label("salary_max"),
+                CareerJob.experience_min.label("experience_min"),
+                CareerJob.experience_max.label("experience_max"),
+                CareerJob.description.label("description"),
+                CareerJob.skills_required.label("skills_required"),
+                CareerJob.job_type.label("job_type"),
+                CareerJob.apply_email.label("apply_email"),
+                cast(literal_column("'unknown'"), String(20)).label("email_trust"),
+                CareerJob.apply_url.label("apply_url"),
+                CareerJob.posted_at.label("posted_at"),
+                CareerJob.scraped_at.label("scraped_at"),
+                CareerJob.last_seen_at.label("last_seen_at"),
+                CareerJob.status.label("status")
+            ).select_from(
+                CareerJob.__table__.join(Company.__table__, CareerJob.company_id == Company.company_id)
+            ).where(CareerJob.status != "closed")
+
+            if source and source != "career_page":
+                cj_stmt = cj_stmt.where(literal_column("1") == literal_column("0"))
+                
+            if search:
+                from sqlalchemy import or_
+                search_term = f"%{search}%"
+                cj_stmt = cj_stmt.where(
+                    or_(
+                        CareerJob.job_title.ilike(search_term),
+                        Company.company_name.ilike(search_term),
+                        CareerJob.description.ilike(search_term)
+                    )
+                )
+                
+            stmts.append(cj_stmt)
+
+        union_stmt = union_all(*stmts)
+        subq = union_stmt.subquery()
+        
+        count_stmt = select(func.count()).select_from(subq)
         total = (await self._session.execute(count_stmt)).scalar() or 0
         
-        # Get paginated results
-        stmt = base_stmt.order_by(Job.last_seen_at.desc()).limit(limit).offset(offset)
+        stmt = select(subq).order_by(subq.c.last_seen_at.desc()).limit(limit).offset(offset)
         result = await self._session.execute(stmt)
-        return [_orm_job_to_record(row) for row in result.scalars().all()], total
+        
+        return [_orm_job_to_record(row) for row in result.all()], total
 
     async def get_job_counts(self) -> Dict:
         """Return aggregated job counts by source, status, and email_trust."""

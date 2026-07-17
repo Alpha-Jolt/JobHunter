@@ -354,56 +354,64 @@ Return a JSON object containing an array of groups, each with a 'role_name', a l
                 continue
                 
             optimised_variant, comparison_result, variant_obj = pipeline_result
-            
-            # 4. Save a VariantRecord for EACH job in the group reusing the same curated_json
-            master_resume_id, _, _ = await self.master_resume_registry.get_or_create(user_id=user_id, file_path=master_resume_path)
-            
-            for jid in g_job_ids:
-                job_uuid = uuid.UUID(jid)
-                variant_id = uuid.uuid4()
-                base_key = f"{user_id}/{job_uuid}"
-                
-                # Trigger background render/upload after save() flushes the row
-                if variant_obj and not optimised_variant.get("is_rejected"):
-                    import asyncio
-                    task = asyncio.create_task(
-                        self._render_and_upload_async(
-                            variant_id, base_key, variant_obj
-                        )
-                    )
-                    _background_tasks.add(task)
-                    task.add_done_callback(_background_tasks.discard)
-                
-                curated_json = optimised_variant.get("curated_json", {})
-                gaps = optimised_variant.get("gaps", [])
-                match_score = comparison_result.get("match_score", 0)
-                
-                variant_record = VariantRecord(
-                    variant_id=variant_id,
-                    user_id=user_id,
-                    job_id=job_uuid,
-                    master_resume_id=master_resume_id,
-                    pdf_key="",
-                    docx_key="",
-                    cover_letter_key="",
-                    curated_json={**curated_json, "match_score": match_score},
-                    gaps_identified=gaps,
-                    approval_status="rejected" if optimised_variant.get("is_rejected") else "pending",
-                    prompt_version=optimised_variant.get("prompt_version", ""),
-                    created_at=datetime.now(timezone.utc),
+
+            # 4. Save ONE VariantRecord per role group (not per job_id).
+            #    The representative job is the first in the group; all grouped
+            #    job_ids are stored in curated_json for traceability.
+            master_resume_id, _, _ = await self.master_resume_registry.get_or_create(
+                user_id=user_id, file_path=master_resume_path
+            )
+
+            representative_job_id = uuid.UUID(g_job_ids[0])
+            variant_id = uuid.uuid4()
+            base_key = f"{user_id}/{representative_job_id}"
+
+            curated_json = optimised_variant.get("curated_json", {})
+            gaps = optimised_variant.get("gaps", [])
+            match_score = comparison_result.get("match_score", 0)
+
+            variant_record = VariantRecord(
+                variant_id=variant_id,
+                user_id=user_id,
+                job_id=representative_job_id,
+                master_resume_id=master_resume_id,
+                pdf_key="",
+                docx_key="",
+                cover_letter_key="",
+                curated_json={
+                    **curated_json,
+                    "match_score": match_score,
+                    "role_name": role_name,
+                    "grouped_job_ids": g_job_ids,  # All jobs this variant covers
+                },
+                gaps_identified=gaps,
+                approval_status="rejected" if optimised_variant.get("is_rejected") else "pending",
+                prompt_version=optimised_variant.get("prompt_version", ""),
+                created_at=datetime.now(timezone.utc),
+            )
+
+            await self.variant_registry.save(variant_record)
+
+            # Background render/upload
+            if variant_obj and not optimised_variant.get("is_rejected"):
+                import asyncio
+                task = asyncio.create_task(
+                    self._render_and_upload_async(variant_id, base_key, variant_obj)
                 )
-                
-                await self.variant_registry.save(variant_record)
-                
-                # Fetch job record to get email
-                original_job = next((j for j in job_records if str(j.job_id) == str(jid)), None)
-                user_email = getattr(original_job, "apply_email", "") or "" if original_job else ""
-                
-                token = self.approval_service.generate_approval_token(
-                    str(variant_id), user_email
+                _background_tasks.add(task)
+                task.add_done_callback(_background_tasks.discard)
+
+            # Approval token — use representative job's apply_email
+            original_job = next((j for j in job_records if str(j.job_id) == g_job_ids[0]), None)
+            user_email = getattr(original_job, "apply_email", "") or "" if original_job else ""
+            token = self.approval_service.generate_approval_token(str(variant_id), user_email)
+            variant_record.approval_token = token
+            await self.variant_registry.update_approval_token(variant_id, token)
+
+            if yield_progress:
+                await yield_progress(
+                    f"Variant saved for '{role_name}' covering {len(g_job_ids)} job(s)."
                 )
-                variant_record.approval_token = token
-                await self.variant_registry.update_approval_token(variant_id, token)
 
     async def _render_and_upload_async(self, variant_id, base_key, variant_obj):
         """Background task: render DOCX/PDF and upload to MinIO, then UPDATE the DB row.
@@ -555,8 +563,8 @@ Return a JSON object containing an array of groups, each with a 'role_name', a l
         return (
             {
                 "curated_json": curated_json,
-                "gaps": list(variant.gaps),
-                "prompt_version": variant.prompt_version_used,
+                "gaps": gaps,
+                "prompt_version": prompt_version,
                 "match_score": comparison.match_score,
                 "pdf_path": "",
                 "docx_path": "",

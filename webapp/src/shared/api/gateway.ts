@@ -7,6 +7,8 @@ import type {
   ResumeUploadResponse,
   GenerateVariantResponse,
   PendingVariantsResponse,
+  AllVariantsResponse,
+  VariantSummaryFull,
   PreviewVariantResponse,
   ApproveVariantResponse,
   ApplicationRecord,
@@ -51,7 +53,9 @@ export const authApi = {
 export const jobsApi = {
   list: (params?: { source?: string; limit?: number; offset?: number; search?: string }) =>
     client
-      .get<{ jobs: JobRecord[]; total?: number }>("/api/scraper/latest-jobs", { params })
+      .get<{ jobs: JobRecord[]; total?: number }>("/api/scraper/latest-jobs", { 
+        params: { ...params, include_career_jobs: true } 
+      })
       .then((r) => r.data),
 
   counts: () =>
@@ -110,7 +114,15 @@ export const variantsApi = {
     client
       .post(`/api/ai/reject/${variantId}`, { user_feedback })
       .then((r) => r.data),
+
+  all: (userId: string) =>
+    client
+      .get<AllVariantsResponse>(`/api/ai/variants/${userId}`)
+      .then((r) => r.data),
 };
+
+// Re-export for convenience
+export type { VariantSummaryFull };
 
 // ── Applications ──────────────────────────────────────────────────────────────
 

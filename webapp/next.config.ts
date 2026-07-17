@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               `img-src 'self' data: blob: ${minioUrl}`,
               "font-src 'self'",
-              `connect-src 'self' ${apiUrl}`,
+              `connect-src 'self' ${apiUrl} ${minioUrl}`,
             ].join("; "),
           },
         ],
