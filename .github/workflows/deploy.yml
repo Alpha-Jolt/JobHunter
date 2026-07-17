@@ -146,7 +146,7 @@ jobs:
               MINIO_ENDPOINT=localhost:9010 bash scripts/setup_minio.sh || true
             fi
 
-            # ──- Mail-Bridge ──────────────────────────────────────────────────
+            # ── Mail-Bridge ──────────────────────────────────────────────────
             # MB_ prefix used in GitHub secrets to avoid name clashes with JobHunter vars.
             # Stripped here when writing the actual .env file Mail-Bridge expects.
             MB_DB="${{ secrets.MB_POSTGRES_DB }}"
