@@ -11,5 +11,4 @@ logs/
 .coverage
 htmlcov/
 *.log
-dev_mode
 scripts

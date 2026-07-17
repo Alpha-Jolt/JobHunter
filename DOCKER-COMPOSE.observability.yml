@@ -57,7 +57,7 @@ services:
     image: grafana/grafana:10.4.1
     container_name: jobhunter-grafana
     env_file:
-      - ./observability/.env
+      - .env
     environment:
       - GF_FEATURE_TOGGLES_ENABLE=traceToLogs
     volumes:
