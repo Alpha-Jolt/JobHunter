@@ -18,6 +18,10 @@ class ScraperTriggerRequest(BaseModel):
     locations: list[str]
     experience: str = ""
     custom_fields: dict = {}
+    type: str = "scrape"
+    domains: list[str] = []
+    chain_apify: bool = False
+    actor_id: str = "apify/indeed-scraper"
 
 @router.post("/trigger")
 async def trigger_scraper(

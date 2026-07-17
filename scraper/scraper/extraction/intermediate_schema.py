@@ -35,3 +35,7 @@ class IntermediateJob(BaseModel):
     extraction_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     extraction_duration_ms: float = 0.0
     extraction_source: str = "html_parser"  # 'html_parser' | 'json_api'
+    
+    # Unmapped fields to preserve (e.g. from Apify actors)
+    extra_raw: dict = Field(default_factory=dict)
+

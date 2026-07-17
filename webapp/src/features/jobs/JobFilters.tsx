@@ -5,7 +5,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/shared/components/Button";
 import { useJobStore } from "@/shared/state/jobStore";
 
-const SOURCES = ["", "naukri", "indeed", "linkedin"];
+const SOURCES = ["", "naukri", "indeed", "linkedin", "apify", "hunter"];
 
 export function JobFilters() {
   const { filters, setFilters } = useJobStore();
