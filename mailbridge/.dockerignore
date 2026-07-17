@@ -1,0 +1,17 @@
+node_modules
+gateway
+.next
+.agent
+.kiro
+.claude
+.kilo
+.codex
+.opencode
+.mimocode
+.kimi
+.agents
+plans
+implementation
+*.md
+.env*
+.github

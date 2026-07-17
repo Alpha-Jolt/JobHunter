@@ -1,0 +1,72 @@
+---
+title: Authentication
+description: JWT-based authentication and token management
+lastUpdated: 2026-05-23
+order: 2
+---
+
+## Overview
+
+Mail-Bridge uses JWT bearer tokens for API authentication. Tokens are issued on login and expire after 24 hours. A refresh token (7-day TTL) is stored server-side and used to issue new access tokens.
+
+## Register
+
+```http
+POST /auth/register
+Content-Type: application/json
+
+{
+  "workspace_name": "Acme Corp",
+  "email": "admin@acme.com",
+  "password": "securepassword"
+}
+```
+
+**Response:**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": { "user_id": "...", "email": "admin@acme.com", "role": "owner" }
+}
+```
+
+## Login
+
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@acme.com",
+  "password": "securepassword"
+}
+```
+
+## Refresh token
+
+```http
+POST /auth/refresh
+Authorization: Bearer EXPIRED_TOKEN
+```
+
+## Using the token
+
+Include the token in the `Authorization` header for all API requests:
+
+```http
+Authorization: Bearer YOUR_JWT_TOKEN
+```
+
+## Token payload
+
+```json
+{
+  "user_id": "uuid",
+  "workspace_id": "uuid",
+  "role": "owner",
+  "tier": "free",
+  "iat": 1716480000,
+  "exp": 1716566400
+}
+```

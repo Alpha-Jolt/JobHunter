@@ -1,0 +1,62 @@
+---
+title: Quickstart
+description: Get Mail-Bridge running in under 5 minutes
+lastUpdated: 2026-05-23
+order: 1
+---
+
+## Prerequisites
+
+- Node.js 18+
+- PostgreSQL 15
+- Redis 7
+- Docker (recommended)
+
+## 1. Clone and configure
+
+```bash
+git clone https://github.com/your-org/mail-bridge.git
+cd mail-bridge/Version2
+cp .env.example .env
+```
+
+Edit `.env` and fill in:
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_SECRET` | Min 32 chars |
+| `CREDENTIAL_MASTER_KEY` | 64 hex chars |
+
+## 2. Start with Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+This starts all 8 microservices, PostgreSQL, and Redis.
+
+## 3. Create your workspace
+
+Open [http://localhost:3010/register](http://localhost:3010/register) and create your workspace.
+
+## 4. Add a credential
+
+Go to **Credentials → Add credential** and connect Gmail, Outlook, or SMTP.
+
+## 5. Send your first email
+
+```bash
+curl -X POST http://localhost:3009/api/emails/send \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credential_id": "YOUR_CREDENTIAL_ID",
+    "to_email": "recipient@example.com",
+    "subject": "Hello from Mail-Bridge",
+    "html": "<p>It works!</p>"
+  }'
+```
+
+You should see the email appear in your **Emails** dashboard within seconds.

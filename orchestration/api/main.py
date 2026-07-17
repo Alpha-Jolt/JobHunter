@@ -25,6 +25,8 @@ from orchestration.api.routes.admin import router as admin_router
 from orchestration.api.routes.health import router as health_router
 from orchestration.auth.routes.auth import router as auth_router
 from orchestration.api.routes.career_jobs import router as career_jobs_router
+from orchestration.api.routes.webhooks import router as webhooks_router
+from orchestration.api.routes.mail_credentials import router as mail_credentials_router
 from orchestration.api.routes.resume import router as resume_router
 from orchestration.api.routes.profile import router as profile_router
 from orchestration.auth.middleware import JWTLoggingMiddleware
@@ -138,6 +140,8 @@ app.include_router(ai_router, prefix="/api/ai", tags=["ai"])
 app.include_router(mail_router)
 app.include_router(admin_router)
 app.include_router(career_jobs_router)
+app.include_router(webhooks_router)
+app.include_router(mail_credentials_router)
 
 # ── Static files (admin dashboard) ──────────────────────────────────────────
 _admin_dir = os.path.join(os.path.dirname(__file__), "..", "static", "admin")

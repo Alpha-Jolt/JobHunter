@@ -1,0 +1,80 @@
+---
+title: API Reference
+description: Complete REST API reference for all endpoints
+lastUpdated: 2026-05-23
+order: 7
+---
+
+All requests go through the API gateway at port `3009`. Include `Authorization: Bearer TOKEN` on all authenticated routes.
+
+## Auth — `/auth`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/auth/register` | Create workspace + owner account |
+| POST | `/auth/login` | Login, receive JWT |
+| POST | `/auth/logout` | Invalidate refresh token |
+| POST | `/auth/refresh` | Issue new access token |
+| GET | `/auth/me` | Get current user info |
+
+## Emails — `/api/emails`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/emails/send` | Send single email |
+| POST | `/api/emails/batch` | Queue batch of emails |
+| POST | `/api/emails/schedule` | Schedule email for future |
+| GET | `/api/emails` | List emails (paginated) |
+| GET | `/api/emails/:id` | Get email detail |
+| GET | `/api/emails/scheduled` | List scheduled emails |
+| DELETE | `/api/emails/scheduled/:id` | Cancel scheduled email |
+
+## Templates — `/api/templates`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/templates` | Create template |
+| GET | `/api/templates` | List templates |
+| GET | `/api/templates/:id` | Get template |
+| PUT | `/api/templates/:id` | Update template (creates version) |
+| DELETE | `/api/templates/:id` | Delete template |
+| GET | `/api/templates/:id/versions` | List versions |
+| POST | `/api/templates/:id/rollback` | Rollback to version |
+
+## Credentials — `/api/credentials`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/credentials/smtp` | Add SMTP credential |
+| GET | `/api/credentials/gmail/connect` | Start Gmail OAuth |
+| GET | `/api/credentials/outlook/connect` | Start Outlook OAuth |
+| GET | `/api/credentials` | List credentials |
+| DELETE | `/api/credentials/:id` | Remove credential |
+| POST | `/api/credentials/:id/test` | Test credential |
+
+## Webhooks — `/api/webhooks`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/webhooks` | Register webhook |
+| GET | `/api/webhooks` | List webhooks |
+| PUT | `/api/webhooks/:id` | Update webhook |
+| DELETE | `/api/webhooks/:id` | Delete webhook |
+| POST | `/api/webhooks/:id/test` | Send test event |
+| GET | `/api/webhooks/:id/deliveries` | List delivery attempts |
+
+## Admin — `/api/admin`
+
+| Method | Path | Description | Role |
+|---|---|---|---|
+| GET | `/api/admin/users` | List workspace users | owner |
+| POST | `/api/admin/users/invite` | Invite user | owner |
+| PUT | `/api/admin/users/:id/role` | Change role | owner |
+| DELETE | `/api/admin/users/:id` | Remove user | owner |
+
+## Health — `/health`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health/live` | Liveness check |
+| GET | `/health/ready` | Readiness check (DB + Redis) |

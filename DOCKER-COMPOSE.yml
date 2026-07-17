@@ -112,8 +112,10 @@ services:
     env_file:
       - .env
     environment:
-      MAIL_BRIDGE_URL: ${MAIL_BRIDGE_URL:-http://mail-bridge:3000}
+      MAIL_BRIDGE_URL: ${MAIL_BRIDGE_URL:-https://app.myjobhunter.in}
       MAIL_BRIDGE_API_KEY: ${MAIL_BRIDGE_API_KEY}
+      MAILBRIDGE_WEBHOOK_SECRET: ${MAILBRIDGE_WEBHOOK_SECRET}
+      MAILBRIDGE_WEBHOOK_ID: ${MAILBRIDGE_WEBHOOK_ID}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
@@ -142,21 +144,6 @@ services:
         condition: service_healthy
     networks:
       - jobhunter_network
-  # mail-bridge:
-  #   build:
-  #     context: ../Mail-Engine/Mail-Bridge
-  #   container_name: mail-bridge
-  #   environment:
-  #     REGISTRY_TYPE: memory
-  #     SENDGRID_API_KEY: ${SENDGRID_API_KEY}
-  #     SENDER_EMAIL: apply@jobhunter.app
-  #     SENDER_NAME: JobHunter
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - jobhunter-api
-  #   networks:
-  #     - jobhunter_network
 
 volumes:
   minio_data:

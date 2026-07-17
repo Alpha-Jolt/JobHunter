@@ -1,0 +1,82 @@
+---
+title: Sending Emails
+description: Send single, batch, and scheduled emails
+lastUpdated: 2026-05-23
+order: 3
+---
+
+## Send a single email
+
+```http
+POST /api/emails/send
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "credential_id": "uuid",
+  "to_email": "recipient@example.com",
+  "subject": "Hello {{name}}",
+  "html": "<p>Hi {{name}}, welcome!</p>",
+  "variables": { "name": "Alice" }
+}
+```
+
+Or use a saved template:
+
+```json
+{
+  "credential_id": "uuid",
+  "to_email": "recipient@example.com",
+  "template_id": "uuid",
+  "variables": { "name": "Alice" }
+}
+```
+
+## Batch send
+
+Send up to 100 emails in a single request. All are queued asynchronously.
+
+```http
+POST /api/emails/batch
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "emails": [
+    { "credential_id": "uuid", "to_email": "a@example.com", "subject": "Hi A", "html": "<p>Hello A</p>" },
+    { "credential_id": "uuid", "to_email": "b@example.com", "subject": "Hi B", "html": "<p>Hello B</p>" }
+  ]
+}
+```
+
+**Response:**
+
+```json
+{ "queued": 2, "job_ids": ["uuid1", "uuid2"] }
+```
+
+## Schedule an email
+
+```http
+POST /api/emails/schedule
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "credential_id": "uuid",
+  "to_email": "recipient@example.com",
+  "subject": "Reminder",
+  "html": "<p>Don't forget!</p>",
+  "scheduled_at": "2026-06-01T09:00:00Z"
+}
+```
+
+## Email statuses
+
+| Status | Description |
+|---|---|
+| `queued` | In the Redis queue, not yet processed |
+| `sent` | Successfully delivered to provider |
+| `failed` | All retry attempts exhausted |
+| `scheduled` | Waiting for scheduled time |
+| `cancelled` | Manually cancelled before send |

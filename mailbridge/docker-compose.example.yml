@@ -1,0 +1,62 @@
+# Example Public Docker Compose for Mail-Bridge
+
+version: '3.8'
+
+services:
+  mb-postgres:
+    image: postgres:15-alpine
+    container_name: mb-postgres
+    environment:
+      POSTGRES_DB: mailbridge
+      POSTGRES_USER: mbuser
+      POSTGRES_PASSWORD: mbpassword
+    volumes:
+      - mb_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mb-internal
+    restart: unless-stopped
+
+  mb-redis:
+    image: redis:7-alpine
+    container_name: mb-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - mb_redis_data:/data
+    networks:
+      - mb-internal
+    restart: unless-stopped
+
+  mb-gateway:
+    image: ghcr.io/jobhunter2026/mailbridge-gateway:v1.0.0
+    container_name: mb-gateway
+    ports:
+      - "3009:3009"
+    networks:
+      - mb-internal
+      - mb-public
+    restart: unless-stopped
+    depends_on:
+      - mb-postgres
+      - mb-redis
+
+  # To run the full Mail-Bridge suite, you need to pull and run all API services:
+  # mb-auth, mb-credentials, mb-emails, mb-templates, mb-admin, mb-health, mb-dashboard, mb-webhooks
+  #
+  # Make sure you provide:
+  # MAIL_BRIDGE_LICENSE_KEY
+  # DATABASE_URL
+  # REDIS_URL
+  # JWT_SECRET
+  # CREDENTIAL_MASTER_KEY
+  #
+  # See the OPERATIONAL_GUIDE.md and JOBHUNTER_INTEGRATION.md for complete deployment instructions.
+
+networks:
+  mb-internal:
+    internal: true
+  mb-public:
+    driver: bridge
+
+volumes:
+  mb_postgres_data:
+  mb_redis_data:

@@ -1,0 +1,68 @@
+---
+title: Self-hosting
+description: Deploy Mail-Bridge on your own infrastructure
+lastUpdated: 2026-05-23
+order: 8
+---
+
+## Docker Compose (recommended)
+
+```bash
+cd Version2
+cp .env.example .env
+# Fill in JWT_SECRET and CREDENTIAL_MASTER_KEY
+docker-compose up -d
+```
+
+This starts:
+- All 8 microservices
+- PostgreSQL 15
+- Redis 7
+- Nginx gateway (port 3009)
+- webapp (port 3010)
+- website (port 3011)
+
+## Environment variables
+
+```bash
+# Required
+DATABASE_URL=postgresql://user:pass@localhost:5432/mailbridge
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your-32-char-minimum-secret-here
+CREDENTIAL_MASTER_KEY=64-hex-chars-here
+
+# Gmail OAuth (optional)
+GMAIL_CLIENT_ID=...
+GMAIL_CLIENT_SECRET=...
+GMAIL_REDIRECT_URI=http://localhost:3009/api/credentials/gmail/callback
+
+# Outlook OAuth (optional)
+OUTLOOK_CLIENT_ID=...
+OUTLOOK_CLIENT_SECRET=...
+OUTLOOK_REDIRECT_URI=http://localhost:3009/api/credentials/outlook/callback
+```
+
+## Generating secrets
+
+```bash
+# JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# CREDENTIAL_MASTER_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+## Database migration
+
+```bash
+psql $DATABASE_URL -f Version2/shared/src/db/migrations/001_initial.sql
+```
+
+## Production checklist
+
+- [ ] Set `NODE_ENV=production` on all services
+- [ ] Use strong, unique `JWT_SECRET` and `CREDENTIAL_MASTER_KEY`
+- [ ] Enable TLS on the gateway
+- [ ] Set up PostgreSQL backups
+- [ ] Configure Redis persistence (`appendonly yes`)
+- [ ] Set resource limits on Docker containers

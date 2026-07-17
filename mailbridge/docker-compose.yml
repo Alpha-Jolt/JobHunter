@@ -1,0 +1,283 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mb-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./shared/src/db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/001_initial.sql
+      - ./shared/src/db/migrations/002_phase1.sql:/docker-entrypoint-initdb.d/002_phase1.sql
+      - ./shared/src/db/migrations/003_api_keys_revoked_at.sql:/docker-entrypoint-initdb.d/003_api_keys_revoked_at.sql
+      - ./shared/src/db/migrations/004_incoming_emails.sql:/docker-entrypoint-initdb.d/004_incoming_emails.sql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: mb-redis
+    command: redis-server --appendonly yes
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  auth:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-auth
+    ports:
+      - ${AUTH_PORT:-3001}:3001
+    environment:
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  credentials:
+    build:
+      context: .
+      dockerfile: services/credentials/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-credentials
+    ports:
+      - ${CREDENTIALS_PORT:-3002}:3002
+    environment:
+      PORT: 3002
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI:-http://localhost:3002/api/credentials/gmail/callback}
+      GMAIL_PUBSUB_TOPIC: ${GMAIL_PUBSUB_TOPIC:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      FRONTEND_URL: ${FRONTEND_URL}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  emails:
+    build:
+      context: .
+      dockerfile: services/emails/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-emails
+    ports:
+      - ${EMAILS_PORT:-3003}:3003
+    environment:
+      PORT: 3003
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI:-}
+      GMAIL_PUBSUB_TOPIC: ${GMAIL_PUBSUB_TOPIC:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  templates:
+    build:
+      context: .
+      dockerfile: services/templates/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-templates
+    ports:
+      - ${TEMPLATES_PORT:-3004}:3004
+    environment:
+      PORT: 3004
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  admin:
+    build:
+      context: .
+      dockerfile: services/admin/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-admin
+    ports:
+      - ${ADMIN_PORT:-3005}:3005
+    environment:
+      PORT: 3005
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  health:
+    build:
+      context: .
+      dockerfile: services/health/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-health
+    ports:
+      - ${HEALTH_PORT:-3006}:3006
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  dashboard:
+    build:
+      context: .
+      dockerfile: services/dashboard/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-dashboard
+    ports:
+      - ${DASHBOARD_PORT:-3007}:3007
+    environment:
+      PORT: 3007
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  webhooks:
+    build:
+      context: .
+      dockerfile: services/webhooks/Dockerfile
+      args:
+        LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY}
+    container_name: mb-webhooks
+    ports:
+      - ${WEBHOOKS_PORT:-3008}:3008
+    environment:
+      PORT: 3008
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_MASTER_KEY: ${CREDENTIAL_MASTER_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAIL_BRIDGE_LICENSE_KEY: ${MAIL_BRIDGE_LICENSE_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: mb-gateway
+    ports:
+      - ${GATEWAY_PORT:-3009}:3009
+    depends_on:
+      - auth
+      - credentials
+      - emails
+      - templates
+      - admin
+      - health
+      - webhooks
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: mb-webapp
+    ports:
+      - ${WEBAPP_PORT:-3010}:3010
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3010
+      API_GATEWAY_URL: ${API_GATEWAY_URL:-http://gateway:3009}
+    depends_on:
+      - gateway
+  website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: mb-website
+    ports:
+      - ${WEBSITE_PORT:-3011}:3011
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3011
+    depends_on:
+      - gateway
+volumes:
+  postgres_data: null
+  redis_data: null

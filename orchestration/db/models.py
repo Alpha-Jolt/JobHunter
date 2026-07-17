@@ -219,6 +219,10 @@ class ApplicationLog(Base):
     email_subject = Column(String(500))
     reply_count = Column(Integer, nullable=False, default=0)
     notes = Column(Text)
+    # Mail-Bridge delivery tracking
+    mailbridge_email_id = Column(UUID(as_uuid=True), nullable=True)
+    email_delivery_status = Column(String(20), nullable=False, default="pending")
+    email_delivered_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
@@ -418,6 +422,33 @@ class UserProfile(Base):
     languages = relationship("UserLanguage", back_populates="profile", cascade="all, delete-orphan", order_by="UserLanguage.order_index")
     achievements = relationship("UserAchievement", back_populates="profile", cascade="all, delete-orphan", order_by="UserAchievement.order_index")
     social_links = relationship("UserSocialLink", back_populates="profile", cascade="all, delete-orphan", order_by="UserSocialLink.order_index")
+
+
+class UserMailCredential(Base):
+    """Maps a JobHunter user to their Mail-Bridge credential UUID.
+
+    Each user connects their own Gmail (or SMTP) account via Mail-Bridge OAuth.
+    The returned credential_id is stored here so mail_service can look it up
+    at send time without a hard-coded env UUID.
+    """
+
+    __tablename__ = "user_mail_credentials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    mailbridge_credential_id = Column(UUID(as_uuid=True), nullable=False)
+    provider_type = Column(String(20), nullable=False, default="gmail")
+    from_email = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = relationship("User", backref="mail_credential")
 
 
 class UserExperience(Base):

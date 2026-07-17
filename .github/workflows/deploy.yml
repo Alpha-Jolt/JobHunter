@@ -48,7 +48,7 @@ jobs:
           script: |
             set -e
 
-            # Navigate to project (must be a git clone)
+            # ── JobHunter ────────────────────────────────────────────────────
             cd /docker/JobHunter
 
             if [ ! -d .git ]; then
@@ -58,29 +58,72 @@ jobs:
               exit 1
             fi
 
-            # Single root .env (copy from env.example once, then edit on VPS)
-            if [ ! -f .env ]; then
-              echo "ERROR: /docker/JobHunter/.env is missing."
-              echo "On the VPS run once:"
-              echo "  cp env.example .env && nano .env"
-              exit 1
-            fi
-
-            # ── Pull latest Feature/Deploy ──────────────────────────────────
+            # Pull latest
             git fetch origin Feature/Deploy
             git checkout Feature/Deploy
             git pull origin Feature/Deploy
 
-            # Keep VPS .env — do not overwrite (managed on the server)
+            # Write JobHunter .env from GitHub secrets (vars keep their original names)
+            cat > /docker/JobHunter/.env <<EOF
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DB_POOL_SIZE=5
+            DB_MAX_OVERFLOW=10
+            USE_ALEMBIC_MIGRATIONS=true
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            API_HOST=0.0.0.0
+            API_PORT=8000
+            LOG_LEVEL=INFO
+            SECRET_KEY_APPROVAL=${{ secrets.SECRET_KEY_APPROVAL }}
+            APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}
+            APPROVAL_KEYS=${{ secrets.APPROVAL_KEYS }}
+            APPROVAL_ACTIVE_KEY=k1
+            INTERNAL_API_KEY=${{ secrets.INTERNAL_API_KEY }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_ALGORITHM=HS256
+            JWT_EXPIRY_MINUTES=15
+            REFRESH_TOKEN_EXPIRY_DAYS=30
+            MIN_PASSWORD_LENGTH=8
+            COOKIE_SECURE=true
+            COOKIE_DOMAIN=.myjobhunter.in
+            MAX_APPLICATIONS_PER_DAY=10
+            MAX_VARIANTS_PER_SESSION=15
+            MAX_VARIANTS_TOTAL=50
+            LLM_PRIMARY_PROVIDER=anthropic
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            MAIL_BRIDGE_URL=https://app.myjobhunter.in/mailbridge
+            MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}
+            MAILBRIDGE_WEBHOOK_SECRET=${{ secrets.MAILBRIDGE_WEBHOOK_SECRET }}
+            MAILBRIDGE_WEBHOOK_ID=${{ secrets.MAILBRIDGE_WEBHOOK_ID }}
+            MINIO_ENDPOINT=minio:9000
+            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+            MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
+            MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
+            MINIO_BUCKET_NAME=jobhunter-resumes
+            MINIO_AVATAR_BUCKET_NAME=jobhunter-avatars
+            MINIO_SECURE=false
+            MINIO_EXTERNAL_ENDPOINT=app.myjobhunter.in
+            MINIO_EXTERNAL_SECURE=true
+            REDIS_URL=redis://redis:6379/0
+            OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+            NEXT_PUBLIC_API_BASE_URL=https://api.myjobhunter.in
+            NEXT_PUBLIC_APP_URL=https://app.myjobhunter.in
+            INTERNAL_API_URL=http://jobhunter-api:8000
+            NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.myjobhunter.in
+            ADMIN_API_INTERNAL_URL=http://admin-api:8003
+            EOF
 
-            # ── Rebuild & start (prod port map: webapp→3003, api→8004) ──────
+            # Rebuild & start JobHunter stack
             docker compose -p jobhunter \
               -f DOCKER-COMPOSE.yml \
               -f DOCKER-COMPOSE.prod.yml \
               --env-file .env \
               up -d --build --remove-orphans
 
-            # ── Migrations ──────────────────────────────────────────────────
+            # Run JobHunter migrations
             sleep 15
             docker compose -p jobhunter \
               -f DOCKER-COMPOSE.yml \
@@ -88,11 +131,62 @@ jobs:
               --env-file .env \
               exec -T jobhunter-api alembic upgrade head || true
 
-            # ── MinIO bucket (host port 9010 in prod) ───────────────────────
+            # MinIO bucket setup (host port 9010 in prod)
             if [ -f scripts/setup_minio.sh ]; then
               MINIO_ENDPOINT=localhost:9010 bash scripts/setup_minio.sh || true
             fi
 
+            # ── Mail-Bridge ──────────────────────────────────────────────────
+            # MB_ prefix used in GitHub secrets to avoid name clashes with JobHunter vars.
+            # Stripped here when writing the actual .env file Mail-Bridge expects.
+            cat > /docker/JobHunter/mailbridge/.env <<EOF
+            NODE_ENV=production
+            POSTGRES_DB=${{ secrets.MB_POSTGRES_DB }}
+            POSTGRES_USER=${{ secrets.MB_POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.MB_POSTGRES_PASSWORD }}
+            DATABASE_URL=postgresql://${{ secrets.MB_POSTGRES_USER }}:${{ secrets.MB_POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.MB_POSTGRES_DB }}
+            REDIS_URL=redis://redis:6379
+            JWT_SECRET=${{ secrets.MB_JWT_SECRET }}
+            JWT_EXPIRES_IN=24h
+            CREDENTIAL_MASTER_KEY=${{ secrets.MB_CREDENTIAL_MASTER_KEY }}
+            GMAIL_CLIENT_ID=${{ secrets.MB_GMAIL_CLIENT_ID }}
+            GMAIL_CLIENT_SECRET=${{ secrets.MB_GMAIL_CLIENT_SECRET }}
+            GMAIL_REDIRECT_URI=https://app.myjobhunter.in/mailbridge/api/credentials/gmail/callback
+            GMAIL_PUBSUB_TOPIC=${{ secrets.MB_GMAIL_PUBSUB_TOPIC }}
+            OUTLOOK_CLIENT_ID=${{ secrets.MB_OUTLOOK_CLIENT_ID }}
+            OUTLOOK_CLIENT_SECRET=${{ secrets.MB_OUTLOOK_CLIENT_SECRET }}
+            OUTLOOK_REDIRECT_URI=https://app.myjobhunter.in/mailbridge/api/credentials/outlook/callback
+            OUTLOOK_TENANT_ID=common
+            BATCH_MAX_SIZE=100
+            LOG_LEVEL=info
+            FRONTEND_URL=https://app.myjobhunter.in/mailbridge
+            API_GATEWAY_URL=https://app.myjobhunter.in/mailbridge
+            AUTH_PORT=3001
+            CREDENTIALS_PORT=3002
+            EMAILS_PORT=3003
+            TEMPLATES_PORT=3004
+            ADMIN_PORT=3005
+            HEALTH_PORT=3006
+            DASHBOARD_PORT=3007
+            WEBHOOKS_PORT=3008
+            GATEWAY_PORT=3009
+            WEBAPP_PORT=3010
+            WEBSITE_PORT=3011
+            MAIL_BRIDGE_LICENSE_KEY=${{ secrets.MB_LICENSE_KEY }}
+            LICENSE_SIGNING_KEY=${{ secrets.MB_LICENSE_SIGNING_KEY }}
+            EOF
+
+            # Rebuild & start Mail-Bridge stack
+            cd /docker/JobHunter/mailbridge
+            docker compose -p mailbridge \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              --env-file .env \
+              up -d --build --remove-orphans
+
+            # ── Cleanup ──────────────────────────────────────────────────────
+            cd /docker/JobHunter
             docker image prune -f
 
-            echo "JobHunter deployed → https://app.myjobhunter.in (port 3003)"
+            echo "JobHunter deployed  -> https://app.myjobhunter.in"
+            echo "Mail-Bridge deployed -> https://app.myjobhunter.in/mailbridge"

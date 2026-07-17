@@ -1,0 +1,61 @@
+---
+title: Architecture
+description: How Mail-Bridge is structured internally
+lastUpdated: 2026-05-23
+order: 9
+---
+
+## Overview
+
+Mail-Bridge is a microservices monorepo. All services share a PostgreSQL database and Redis instance. There is no direct HTTP communication between services — they coordinate through the shared DB and Redis pub/sub.
+
+```
+Client → Nginx Gateway (3009)
+           ├── /auth/*          → auth service (3001)
+           ├── /api/credentials → credentials service (3002)
+           ├── /api/emails      → emails service (3003)
+           ├── /api/templates   → templates service (3004)
+           ├── /api/admin       → admin service (3005)
+           ├── /health          → health service (3006)
+           └── /api/webhooks    → webhooks service (3008)
+```
+
+## Services
+
+| Service | Port | Responsibility |
+|---|---|---|
+| `auth` | 3001 | JWT issuance, refresh tokens, user registration |
+| `credentials` | 3002 | Encrypted credential storage, OAuth flows |
+| `emails` | 3003 | Send/batch/schedule, Redis queue worker |
+| `templates` | 3004 | Template CRUD, versioning, Handlebars rendering |
+| `admin` | 3005 | User and workspace management |
+| `health` | 3006 | Liveness and readiness probes |
+| `webhooks` | 3008 | Webhook CRUD, Redis pub/sub delivery |
+
+## Shared package
+
+`@mail-bridge/shared` provides cross-cutting concerns consumed by all services:
+
+- **Logger** — Pino structured logging
+- **Errors** — typed error classes (`AppError`, `AuthError`, `NotFoundError`)
+- **Auth middleware** — JWT validation, role extraction
+- **Authz middleware** — role-based access control
+- **DB** — PostgreSQL pool factory
+- **Queue** — Redis queue helpers
+
+## Email flow
+
+1. Client POSTs to `/api/emails/send`
+2. Emails service validates request, resolves credential
+3. Email job pushed to Redis queue `email:queue`
+4. Worker loop pops job, calls provider (Gmail/Outlook/SMTP)
+5. On success: updates DB status to `sent`, publishes to `webhook:events`
+6. On failure: retries up to 3 times, then marks `failed`
+7. Webhooks service subscribes to `webhook:events`, delivers to registered URLs
+
+## Security
+
+- All JWTs signed with HS256 using `JWT_SECRET`
+- Credentials encrypted with AES-256-GCM using `CREDENTIAL_MASTER_KEY`
+- Nginx gateway enforces rate limits: 5 req/min on auth, 100 req/s on API
+- Device fingerprint header injected by gateway for audit logging

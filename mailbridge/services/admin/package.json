@@ -1,0 +1,37 @@
+{
+  "name": "@mail-bridge/admin",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "lint": "eslint src",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "@mail-bridge/shared": "*",
+    "axios": "1.18.1",
+    "dotenv": "16.3.1",
+    "express": "^4.22.2",
+    "pino": "8.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "4.17.20",
+    "@types/jest": "29.5.8",
+    "@types/node": "20.10.0",
+    "@types/supertest": "2.0.16",
+    "@typescript-eslint/eslint-plugin": "6.13.0",
+    "@typescript-eslint/parser": "6.13.0",
+    "eslint": "8.54.0",
+    "jest": "29.7.0",
+    "nodemon": "3.0.1",
+    "pino-pretty": "10.3.1",
+    "supertest": "6.3.3",
+    "ts-jest": "29.1.1",
+    "ts-node": "10.9.1",
+    "typescript": "5.3.2"
+  }
+}
