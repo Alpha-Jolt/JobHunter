@@ -83,6 +83,8 @@ class AuthConfig(BaseSettings):
     refresh_token_expiry_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRY_DAYS")
     min_password_length: int = Field(default=8, alias="MIN_PASSWORD_LENGTH")
     cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
+    # e.g. ".myjobhunter.in" so app + api subdomains share refresh_token
+    cookie_domain: str = Field(default="", alias="COOKIE_DOMAIN")
 
     @field_validator("jwt_secret")
     @classmethod

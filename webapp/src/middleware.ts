@@ -17,17 +17,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // The access token lives in memory (Zustand), not in cookies.
-  // We cannot inspect it in middleware. Instead, the client-side AuthGuard
-  // handles redirects. Middleware only blocks if there is no refresh cookie,
-  // which signals a definitely-unauthenticated session.
-  const refreshCookie = request.cookies.get("refresh_token");
-  if (!refreshCookie) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
+  // Access token is in memory (Zustand). Refresh cookie is set by the API on
+  // api.myjobhunter.in (optionally Domain=.myjobhunter.in). Middleware on the
+  // app host cannot reliably gate on that cookie across subdomains — AuthGuard
+  // handles silent refresh + redirect on the client.
   return NextResponse.next();
 }
 
