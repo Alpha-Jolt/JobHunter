@@ -98,6 +98,12 @@ class RegisterRequest(BaseModel):
     last_name: Optional[str] = None
     phone: Optional[str] = None
 
+    @field_validator('email')
+    def validate_gmail(cls, v):
+        if not str(v).lower().endswith("@gmail.com"):
+            raise ValueError("Please Login or SignUp with a Gmail Account")
+        return v
+
     @field_validator("password")
     @classmethod
     def _pw_min_length(cls, v: str) -> str:

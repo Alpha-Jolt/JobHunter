@@ -288,9 +288,18 @@ async def preview_resume(
         from orchestration.core.spans import traced
         from orchestration.core.metrics import minio_download_total
         async with traced("MinIO Download Presigned URL"):
+            import mimetypes
+            content_type = mimetypes.guess_type(resume.file_path)[0] or "application/octet-stream"
+            content_disposition = "inline" if content_type == "application/pdf" else f"attachment; filename=\"{resume.file_name}\""
+            
             url = s3_client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': settings.minio.minio_bucket, 'Key': resume.file_path},
+                Params={
+                    'Bucket': settings.minio.minio_bucket, 
+                    'Key': resume.file_path,
+                    'ResponseContentType': content_type,
+                    'ResponseContentDisposition': content_disposition
+                },
                 ExpiresIn=3600
             )
         minio_download_total.add(1)
