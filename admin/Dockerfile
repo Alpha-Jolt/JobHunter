@@ -20,6 +20,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
 
+# Next.js may not create public/ if the app has no static assets
+RUN mkdir -p public
+
 # runner
 FROM base AS runner
 WORKDIR /app
