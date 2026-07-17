@@ -58,10 +58,12 @@ jobs:
               exit 1
             fi
 
-            # Pull latest
+            # Pull latest (stash any local VPS edits, pull, then restore them)
             git fetch origin Feature/Deploy
             git checkout Feature/Deploy
+            git stash || true
             git pull origin Feature/Deploy
+            git stash pop || true
 
             # Write JobHunter .env from GitHub secrets (vars keep their original names)
             cat > /docker/JobHunter/.env <<EOF
