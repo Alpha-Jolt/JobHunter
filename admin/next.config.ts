@@ -3,7 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_ADMIN_API_URL ?? "http://localhost:8003";
+    // Server-side proxy target (Docker service name in compose, or localhost in dev)
+    const apiUrl = process.env.ADMIN_API_INTERNAL_URL
+      ?? process.env.NEXT_PUBLIC_ADMIN_API_URL
+      ?? "http://localhost:8003";
     return [
       {
         source: "/api/:path*",
@@ -12,6 +15,16 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
+    const connectSrc = [
+      "'self'",
+      process.env.NEXT_PUBLIC_ADMIN_API_URL,
+      process.env.ADMIN_API_INTERNAL_URL,
+      "http://localhost:8003",
+      "https://admin-api.myjobhunter.in",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return [
       {
         source: "/(.*)",
@@ -27,7 +40,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' http://localhost:8003",
+              `connect-src ${connectSrc}`,
             ].join("; "),
           },
         ],

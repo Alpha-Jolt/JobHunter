@@ -29,6 +29,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.myjobhunter.in}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.myjobhunter.in}
+        INTERNAL_API_URL: ${INTERNAL_API_URL:-http://jobhunter-api:8000}
 
   # Orchestration API — 8000 taken by TalkBetter livekit token server
   jobhunter-api:
@@ -42,6 +43,7 @@ services:
     build:
       args:
         NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL:-https://admin-api.myjobhunter.in}
+        ADMIN_API_INTERNAL_URL: ${ADMIN_API_INTERNAL_URL:-http://admin-api:8003}
 
   # Admin API
   admin-api:

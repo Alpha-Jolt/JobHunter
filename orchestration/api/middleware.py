@@ -1,6 +1,7 @@
 """Custom middleware for JobHunter orchestration API."""
 
 import logging
+import os
 import time
 import uuid
 
@@ -62,9 +63,12 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
 
 
 CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "https://jobhunter.app",
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://localhost:5173,https://app.myjobhunter.in,https://jobhunter.app",
+    ).split(",")
+    if origin.strip()
 ]
 
 
@@ -83,7 +87,6 @@ def add_cors(app) -> None:
     )
 
 import hashlib
-import os
 from opentelemetry import trace
 
 class OTelContextMiddleware(BaseHTTPMiddleware):
