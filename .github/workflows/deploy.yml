@@ -58,12 +58,16 @@ jobs:
               exit 1
             fi
 
-            # Pull latest (stash any local VPS edits, pull, then restore them)
-            git fetch origin Feature/Deploy
-            git checkout Feature/Deploy
+            # Recover from any previous conflicted state and pull latest
+            git reset --hard origin/Feature/Deploy || true
             git stash || true
             git pull origin Feature/Deploy
-            git stash pop || true
+
+            # Restore local VPS edits. On conflict, keep the local VPS version (--theirs).
+            if ! git stash pop; then
+              git checkout --theirs . || true
+              git reset || true
+            fi
 
             # Write JobHunter .env from GitHub secrets (vars keep their original names)
             cat > /docker/JobHunter/.env <<EOF
