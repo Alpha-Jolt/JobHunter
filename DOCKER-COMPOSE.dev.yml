@@ -1,0 +1,19 @@
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: jobhunter-nginx-dev
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN_NAME=myjobhunter.in
+    volumes:
+      - ./nginx/templates/dev.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - jobhunter-api
+      - admin-api
+      - webapp
+      - admin
+    networks:
+      - jobhunter_network

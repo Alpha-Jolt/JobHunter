@@ -1,0 +1,98 @@
+name: Deploy JobHunter to Production VPS
+
+on:
+  push:
+    branches:
+      - Feature/Deploy
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Typecheck & build webapp
+        working-directory: webapp
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.myjobhunter.in
+          NEXT_PUBLIC_APP_URL: https://app.myjobhunter.in
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+  deploy:
+    name: Deploy to Production VPS
+    needs: test
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST_IP }}
+          username: ${{ secrets.HOST_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          command_timeout: 30m
+          script: |
+            set -e
+
+            # Navigate to project (must be a git clone)
+            cd /docker/JobHunter
+
+            if [ ! -d .git ]; then
+              echo "ERROR: /docker/JobHunter is not a git repo."
+              echo "On the VPS run once:"
+              echo "  cd /docker && git clone -b Feature/Deploy https://github.com/Alpha-Jolt/JobHunter.git JobHunter"
+              exit 1
+            fi
+
+            # Single root .env (copy from env.example once, then edit on VPS)
+            if [ ! -f .env ]; then
+              echo "ERROR: /docker/JobHunter/.env is missing."
+              echo "On the VPS run once:"
+              echo "  cp env.example .env && nano .env"
+              exit 1
+            fi
+
+            # ── Pull latest Feature/Deploy ──────────────────────────────────
+            git fetch origin Feature/Deploy
+            git checkout Feature/Deploy
+            git pull origin Feature/Deploy
+
+            # Keep VPS .env — do not overwrite (managed on the server)
+
+            # ── Rebuild & start (prod port map: webapp→3003, api→8004) ──────
+            docker compose -p jobhunter \
+              -f DOCKER-COMPOSE.yml \
+              -f DOCKER-COMPOSE.prod.yml \
+              --env-file .env \
+              up -d --build --remove-orphans
+
+            # ── Migrations ──────────────────────────────────────────────────
+            sleep 15
+            docker compose -p jobhunter \
+              -f DOCKER-COMPOSE.yml \
+              -f DOCKER-COMPOSE.prod.yml \
+              --env-file .env \
+              exec -T jobhunter-api alembic upgrade head || true
+
+            # ── MinIO bucket (host port 9010 in prod) ───────────────────────
+            if [ -f scripts/setup_minio.sh ]; then
+              MINIO_ENDPOINT=localhost:9010 bash scripts/setup_minio.sh || true
+            fi
+
+            docker image prune -f
+
+            echo "JobHunter deployed → https://app.myjobhunter.in (port 3003)"

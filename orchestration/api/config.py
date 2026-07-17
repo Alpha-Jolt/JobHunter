@@ -67,7 +67,7 @@ class MailConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     sendgrid_api_key: Optional[str] = Field(default=None, alias="SENDGRID_API_KEY")
-    mail_sender_email: str = Field(default="apply@myjobhunter.in", alias="MAIL_SENDER_EMAIL")
+    mail_sender_email: str = Field(default="[EMAIL_ADDRESS]", alias="MAIL_SENDER_EMAIL")
     mail_bridge_url: str = Field(default="http://localhost:3000", alias="MAIL_BRIDGE_URL")
     mail_bridge_api_key: str = Field(default="", alias="MAIL_BRIDGE_API_KEY")
 
@@ -83,6 +83,8 @@ class AuthConfig(BaseSettings):
     refresh_token_expiry_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRY_DAYS")
     min_password_length: int = Field(default=8, alias="MIN_PASSWORD_LENGTH")
     cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
+    # e.g. ".myjobhunter.in" so app + api subdomains share refresh_token
+    cookie_domain: str = Field(default="", alias="COOKIE_DOMAIN")
 
     @field_validator("jwt_secret")
     @classmethod
@@ -101,6 +103,8 @@ class MinIOConfig(BaseSettings):
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
     minio_avatar_bucket: str = Field(default="jobhunter-avatars", alias="MINIO_AVATAR_BUCKET_NAME")
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
+    minio_external_endpoint: str | None = Field(default=None, alias="MINIO_EXTERNAL_ENDPOINT")
+    minio_external_secure: bool | None = Field(default=None, alias="MINIO_EXTERNAL_SECURE")
 
 class RedisConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

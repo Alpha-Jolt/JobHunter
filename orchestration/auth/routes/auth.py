@@ -53,19 +53,27 @@ def _make_service(session: AsyncSession) -> AuthService:
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
     s = get_settings()
-    response.set_cookie(
-        key=_REFRESH_COOKIE,
-        value=token,
-        httponly=True,
-        secure=s.auth.cookie_secure,
-        samesite="lax",
-        max_age=_COOKIE_MAX_AGE,
-        path="/",
-    )
+    kwargs = {
+        "key": _REFRESH_COOKIE,
+        "value": token,
+        "httponly": True,
+        "secure": s.auth.cookie_secure,
+        "samesite": "lax",
+        "max_age": _COOKIE_MAX_AGE,
+        "path": "/",
+    }
+    # Share cookie across app/api subdomains in production
+    if s.auth.cookie_domain:
+        kwargs["domain"] = s.auth.cookie_domain
+    response.set_cookie(**kwargs)
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=_REFRESH_COOKIE, path="/")
+    s = get_settings()
+    kwargs = {"key": _REFRESH_COOKIE, "path": "/"}
+    if s.auth.cookie_domain:
+        kwargs["domain"] = s.auth.cookie_domain
+    response.delete_cookie(**kwargs)
 
 
 def _user_to_dict(user: UserRecord) -> dict:
@@ -89,6 +97,12 @@ class RegisterRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
+
+    @field_validator('email')
+    def validate_gmail(cls, v):
+        if not str(v).lower().endswith("@gmail.com"):
+            raise ValueError("Please Login or SignUp with a Gmail Account")
+        return v
 
     @field_validator("password")
     @classmethod

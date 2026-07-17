@@ -13,7 +13,7 @@ cd admin/
 npm install
 cp .env.local.example .env.local   # if present, else set NEXT_PUBLIC_ADMIN_API_URL manually
 npm run dev
-# http://localhost:3000 (dev)  →  http://localhost:5001 (Docker)
+# URL: https://admin.myjobhunter.in (Docker / Prod via Nginx)
 ```
 
 ---
@@ -111,7 +111,7 @@ npm run lint          # next lint
 
 ```bash
 docker compose up -d --build admin
-# Accessible at http://localhost:5001
+# Accessible at https://admin.myjobhunter.in
 ```
 
 The Dockerfile uses a multi-stage build (`deps → builder → runner`) with Next.js standalone output. The final image runs as a non-root `nextjs` user.

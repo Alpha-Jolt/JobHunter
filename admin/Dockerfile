@@ -15,10 +15,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ARG NEXT_PUBLIC_ADMIN_API_URL=http://localhost:8003
+ARG ADMIN_API_INTERNAL_URL=http://admin-api:8003
 ENV NEXT_PUBLIC_ADMIN_API_URL=$NEXT_PUBLIC_ADMIN_API_URL
+ENV ADMIN_API_INTERNAL_URL=$ADMIN_API_INTERNAL_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
+
+# Next.js may not create public/ if the app has no static assets
+RUN mkdir -p public
 
 # runner
 FROM base AS runner

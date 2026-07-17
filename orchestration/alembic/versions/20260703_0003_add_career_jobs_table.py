@@ -17,6 +17,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "career_jobs" in inspector.get_table_names():
+        return
+
     op.create_table(
         "career_jobs",
         sa.Column(

@@ -57,15 +57,13 @@ services:
     image: grafana/grafana:10.4.1
     container_name: jobhunter-grafana
     env_file:
-      - ./observability/.env
+      - .env
     environment:
       - GF_FEATURE_TOGGLES_ENABLE=traceToLogs
     volumes:
       - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
       - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - grafana_data:/var/lib/grafana
-    ports:
-      - "4000:3000" # Grafana HTTP
     networks:
       - default
 

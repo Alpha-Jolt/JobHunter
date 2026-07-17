@@ -1,0 +1,51 @@
+# Production overrides for VPS (coexists with other apps).
+# Host nginx terminates TLS and proxies to published localhost ports.
+#
+#   app.myjobhunter.in  → 127.0.0.1:3003  (webapp)
+#   api.myjobhunter.in  → 127.0.0.1:8004  (orchestration API)
+#
+# Usage:
+#   docker compose -p jobhunter -f DOCKER-COMPOSE.yml -f DOCKER-COMPOSE.prod.yml up -d --build
+
+services:
+  # Keep DB/cache off the host — avoid clashes with TalkBetter/DIMA/etc.
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  # MinIO only on localhost (setup_minio.sh / local admin)
+  minio:
+    ports: !override
+      - "127.0.0.1:9010:9000"
+      - "127.0.0.1:9011:9001"
+
+  # Next.js webapp — free port 3003 (3000=VSRN, 3001=TalkBetter, 3002=Website)
+  webapp:
+    ports: !override
+      - "127.0.0.1:3003:3000"
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.myjobhunter.in}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.myjobhunter.in}
+        INTERNAL_API_URL: ${INTERNAL_API_URL:-http://jobhunter-api:8000}
+
+  # Orchestration API — 8000 taken by TalkBetter livekit token server
+  jobhunter-api:
+    ports: !override
+      - "127.0.0.1:8004:8000"
+
+  # Admin UI — 5001 taken by VSRN backend
+  admin:
+    ports: !override
+      - "127.0.0.1:5004:3001"
+    build:
+      args:
+        NEXT_PUBLIC_ADMIN_API_URL: ${NEXT_PUBLIC_ADMIN_API_URL:-https://admin-api.myjobhunter.in}
+        ADMIN_API_INTERNAL_URL: ${ADMIN_API_INTERNAL_URL:-http://admin-api:8003}
+
+  # Admin API
+  admin-api:
+    ports: !override
+      - "127.0.0.1:8005:8003"
