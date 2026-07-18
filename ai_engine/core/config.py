@@ -148,24 +148,42 @@ class Settings(BaseSettings):
         default="https://jobhunter-api:8000", alias="INTERNAL_API_URL"
     )
 
+    @staticmethod
+    def _is_internal_url(url: str) -> bool:
+        """Return True for localhost or single-label Docker hostnames (no public TLD).
+
+        Internal Docker service names (e.g. ``jobhunter-api``) have no dots in
+        their hostname and are never publicly routable, so HTTPS is not required.
+        """
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or ""
+        is_localhost = host in {"localhost", "127.0.0.1", "::1"}
+        is_docker_service = "." not in host  # single-label: no public TLD
+        return is_localhost or is_docker_service
+
     @model_validator(mode="after")
     def _enforce_https_on_production(self) -> Self:
-        """Refuse to start if HTTP is used outside a development environment."""
+        """Refuse to start if HTTP is used outside a development environment.
+
+        Internal Docker-network URLs (single-label hostnames such as
+        ``jobhunter-api``) are exempt because they are never publicly routable.
+        """
         is_dev = self.environment.lower() in {"development", "local", "dev"}
         url_is_http = self.orchestration_api_url.startswith("http://")
         minio_no_ssl = self.minio.enabled and not self.minio.use_ssl
 
         if not is_dev and (url_is_http or minio_no_ssl):
             problems = []
-            if url_is_http:
+            if url_is_http and not self._is_internal_url(self.orchestration_api_url):
                 problems.append(f"orchestration_api_url uses HTTP: {self.orchestration_api_url}")
             if minio_no_ssl:
                 problems.append("MinIO use_ssl=False on non-development environment")
-            raise ValueError(
-                "Insecure HTTP configuration detected on non-development environment. "
-                f"Problems: {'; '.join(problems)}. "
-                "Set ENVIRONMENT=development to override, or fix your URLs."
-            )
+            if problems:
+                raise ValueError(
+                    "Insecure HTTP configuration detected on non-development environment. "
+                    f"Problems: {'; '.join(problems)}. "
+                    "Set ENVIRONMENT=development to override, or fix your URLs."
+                )
         return self
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
