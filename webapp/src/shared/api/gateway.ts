@@ -102,6 +102,12 @@ export const variantsApi = {
       .get<PreviewVariantResponse>(`/api/ai/preview/${variantId}`)
       .then((r) => r.data),
 
+  pdfPreview: (variantId: string) =>
+    client
+      .get<{ url: string }>(`/api/ai/pdf-preview/${variantId}`)
+      .then((r) => r.data),
+
+
   getToken: (variantId: string): Promise<{ approval_token: string }> =>
     client.get(`/api/ai/variant/${variantId}/token`).then((r) => r.data),
 

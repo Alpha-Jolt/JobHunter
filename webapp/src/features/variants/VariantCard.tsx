@@ -60,7 +60,17 @@ export function VariantCard({ variant, onApprove, onReject }: VariantCardProps) 
     setIsRejecting(false);
   };
 
-  const handleDownload = (format: string, action: "download" | "preview" = "download") => {
+  const handleDownload = async (format: string, action: "download" | "preview" = "download") => {
+    if (action === "preview" && format === "pdf") {
+      try {
+        const data = await variantsApi.pdfPreview(variant.variant_id);
+        window.open(data.url, "_blank");
+      } catch {
+        addToast("error", "Failed to load PDF preview.");
+      }
+      return;
+    }
+
     const url = `${config.apiBaseUrl}/api/ai/download/${variant.variant_id}?format=${format}`;
     const token = getAccessToken();
     fetch(url, { headers: { Authorization: `Bearer ${token}` } })
@@ -69,22 +79,16 @@ export function VariantCard({ variant, onApprove, onReject }: VariantCardProps) 
         return res.blob();
       })
       .then((blob) => {
-        // Force MIME type for PDF so the browser opens it in the viewer instead of downloading
-        const properBlob = format === "pdf" ? new Blob([blob], { type: "application/pdf" }) : blob;
-        const blobUrl = window.URL.createObjectURL(properBlob);
-        if (action === "preview" && format === "pdf") {
-          window.open(blobUrl, "_blank");
-        } else {
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = `Resume_${variant.variant_id}.${format}`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(blobUrl);
-        }
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `Resume_${variant.variant_id}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(blobUrl);
       })
-      .catch(() => addToast("error", `Failed to ${action} ${format.toUpperCase()}`));
+      .catch(() => addToast("error", `Failed to download ${format.toUpperCase()}`));
   };
 
   const getScoreColor = (score: number) => {
