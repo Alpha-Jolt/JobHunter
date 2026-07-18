@@ -8,51 +8,68 @@ interface JwtPayload {
   exp: number
 }
 
-// Routes only accessible by 'owner' role
+const BASE = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
 const OWNER_ONLY = ['/credentials', '/webhooks', '/admin']
 
+function stripBase(pathname: string): string {
+  if (BASE && (pathname === BASE || pathname.startsWith(`${BASE}/`))) {
+    const rest = pathname.slice(BASE.length)
+    return rest || '/'
+  }
+  return pathname
+}
+
+function redirect(req: NextRequest, path: string): NextResponse {
+  // Keep redirects under basePath (new URL('/login', origin) would escape it)
+  const target = BASE && path.startsWith('/') ? `${BASE}${path}` : path
+  return NextResponse.redirect(new URL(target, req.url))
+}
+
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
+  const pathname = stripBase(req.nextUrl.pathname)
   const token = req.cookies.get('mb_token')?.value
 
-  // Allow auth pages without token
   if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
-    if (token) return NextResponse.redirect(new URL('/', req.url))
+    if (token) return redirect(req, '/')
     return NextResponse.next()
   }
 
-  // Allow API routes to handle their own auth
   if (pathname.startsWith('/api/')) return NextResponse.next()
 
-  // Require token for all other routes
   if (!token) {
-    return NextResponse.redirect(new URL(`/login?from=${encodeURIComponent(pathname)}`, req.url))
+    return redirect(req, `/login?from=${encodeURIComponent(pathname)}`)
   }
 
   try {
     const payload = jwtDecode<JwtPayload>(token)
 
-    // Check expiry
     if (payload.exp * 1000 < Date.now()) {
-      const res = NextResponse.redirect(new URL('/login', req.url))
-      res.cookies.set('mb_token', '', { httpOnly: true, path: '/', maxAge: 0 })
+      const res = redirect(req, '/login')
+      res.cookies.set('mb_token', '', {
+        httpOnly: true,
+        path: BASE || '/',
+        maxAge: 0,
+      })
       return res
     }
 
-    // RBAC: owner-only routes
-    const isOwnerRoute = OWNER_ONLY.some(r => pathname.startsWith(r))
+    const isOwnerRoute = OWNER_ONLY.some((r) => pathname.startsWith(r))
     if (isOwnerRoute && payload.role !== 'owner') {
-      return NextResponse.redirect(new URL('/', req.url))
+      return redirect(req, '/')
     }
 
     return NextResponse.next()
   } catch {
-    const res = NextResponse.redirect(new URL('/login', req.url))
-    res.cookies.set('mb_token', '', { httpOnly: true, path: '/', maxAge: 0 })
+    const res = redirect(req, '/login')
+    res.cookies.set('mb_token', '', {
+      httpOnly: true,
+      path: BASE || '/',
+      maxAge: 0,
+    })
     return res
   }
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|public/).*)']
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public/).*)'],
 }
