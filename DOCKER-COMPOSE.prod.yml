@@ -27,7 +27,7 @@ services:
       - "127.0.0.1:3003:3000"
     build:
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://api.myjobhunter.in}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-same-origin}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.myjobhunter.in}
         INTERNAL_API_URL: ${INTERNAL_API_URL:-http://jobhunter-api:8000}
 

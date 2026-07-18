@@ -2,8 +2,22 @@ import type { NextConfig } from "next";
 
 const minioUrl = process.env.NEXT_PUBLIC_MINIO_URL ?? "http://localhost:9000";
 const parsedMinioUrl = new URL(minioUrl);
-const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const apiUrl =
+  rawApiUrl === "" || rawApiUrl === "/" || rawApiUrl === "same-origin"
+    ? ""
+    : rawApiUrl.replace(/\/$/, "");
 const internalApiUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+
+const connectSrc = [
+  "'self'",
+  apiUrl,
+  minioUrl,
+  "https://cloudflareinsights.com",
+  "https://*.cloudflareinsights.com",
+]
+  .filter(Boolean)
+  .join(" ");
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -22,6 +36,11 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         destination: `${internalApiUrl}/api/:path*`,
+      },
+      // Health proxied for same-origin checks
+      {
+        source: "/health",
+        destination: `${internalApiUrl}/health`,
       },
     ];
   },
@@ -42,11 +61,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // Cloudflare Web Analytics beacon (injected by CF when enabled)
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
               "style-src 'self' 'unsafe-inline'",
               `img-src 'self' data: blob: ${minioUrl}`,
               "font-src 'self'",
-              `connect-src 'self' ${apiUrl} ${minioUrl}`,
+              `connect-src ${connectSrc}`,
             ].join("; "),
           },
         ],
