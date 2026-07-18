@@ -47,8 +47,10 @@ SSL mode: **Full (strict)** if origin cert covers `*.myjobhunter.in`.
 ```bash
 cd /docker/JobHunter
 cp env.example .env
-nano .env   # fill secrets — CI never overwrites this file
+nano .env   # optional local edits
 ```
+
+CI deploy copies `env.example` → `.env` on each push to `Feature/Deploy`, then overlays any non-empty GitHub Production secrets (same key names). Update secrets in `env.example` (or GitHub) — not by hand-editing a partial list in the workflow.
 
 ### Required production values (must match this shape)
 

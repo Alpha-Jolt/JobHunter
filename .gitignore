@@ -235,3 +235,5 @@ SUMMARY.md
 REPORT.md
 
 *env*
+!env.example
+!**/.env.example

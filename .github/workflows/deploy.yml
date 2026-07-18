@@ -64,83 +64,60 @@ jobs:
             git clean -fd -e .env -e .deploy-secrets -e mailbridge/.env -e registries -e scraper/output -e scraper/logs
             git stash clear || true
 
-            # Static DB defaults (same style as JWT/approval secrets). Override via GitHub
-            # secrets if set; empty secrets must not wipe these values.
-            JH_PG_USER="${{ secrets.POSTGRES_USER }}"
-            JH_PG_PASS="${{ secrets.POSTGRES_PASSWORD }}"
-            JH_PG_DB="${{ secrets.POSTGRES_DB }}"
-            JH_DB_URL="${{ secrets.DATABASE_URL }}"
-            JH_PG_USER="${JH_PG_USER:-jobhunter}"
-            JH_PG_PASS="${JH_PG_PASS:-jobhunter}"
-            JH_PG_DB="${JH_PG_DB:-jobhunter}"
-            if [ -z "$JH_DB_URL" ]; then
-              JH_DB_URL="postgresql+asyncpg://${JH_PG_USER}:${JH_PG_PASS}@postgres:5432/${JH_PG_DB}"
+            # Base .env = env.example (source of truth for all keys/secrets)
+            if [ ! -f env.example ]; then
+              echo "ERROR: env.example missing after git reset"
+              exit 1
+            fi
+            cp env.example /docker/JobHunter/.env
+
+            # Overlay helper: set KEY=VAL in .env only when VAL is non-empty
+            upsert_env() {
+              KEY="$1"
+              VAL="$2"
+              [ -n "$VAL" ] || return 0
+              if grep -qE "^${KEY}=" /docker/JobHunter/.env; then
+                # Escape sed replacement metachars in VAL
+                ESC=$(printf '%s' "$VAL" | sed -e 's/[\\/&|]/\\&/g')
+                sed -i "s|^${KEY}=.*|${KEY}=${ESC}|" /docker/JobHunter/.env
+              else
+                echo "${KEY}=${VAL}" >> /docker/JobHunter/.env
+              fi
+            }
+
+            # Optional GitHub Production secrets override env.example (empty = keep example)
+            upsert_env DATABASE_URL "${{ secrets.DATABASE_URL }}"
+            upsert_env POSTGRES_USER "${{ secrets.POSTGRES_USER }}"
+            upsert_env POSTGRES_PASSWORD "${{ secrets.POSTGRES_PASSWORD }}"
+            upsert_env POSTGRES_DB "${{ secrets.POSTGRES_DB }}"
+            upsert_env POSTGRES_URL "${{ secrets.DATABASE_URL }}"
+            upsert_env SECRET_KEY_APPROVAL "${{ secrets.SECRET_KEY_APPROVAL }}"
+            upsert_env APPROVAL_TOKEN_SECRET "${{ secrets.APPROVAL_TOKEN_SECRET }}"
+            upsert_env APPROVAL_KEYS "${{ secrets.APPROVAL_KEYS }}"
+            upsert_env INTERNAL_API_KEY "${{ secrets.INTERNAL_API_KEY }}"
+            upsert_env JWT_SECRET "${{ secrets.JWT_SECRET }}"
+            upsert_env ANTHROPIC_API_KEY "${{ secrets.ANTHROPIC_API_KEY }}"
+            upsert_env OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}"
+            upsert_env OPENROUTER_API_KEY "${{ secrets.OPENROUTER_API_KEY }}"
+            upsert_env MAIL_BRIDGE_API_KEY "${{ secrets.MAIL_BRIDGE_API_KEY }}"
+            upsert_env MAILBRIDGE_WEBHOOK_SECRET "${{ secrets.MAILBRIDGE_WEBHOOK_SECRET }}"
+            upsert_env MAILBRIDGE_WEBHOOK_ID "${{ secrets.MAILBRIDGE_WEBHOOK_ID }}"
+            upsert_env MINIO_ROOT_USER "${{ secrets.MINIO_ROOT_USER }}"
+            upsert_env MINIO_ROOT_PASSWORD "${{ secrets.MINIO_ROOT_PASSWORD }}"
+            upsert_env MINIO_ACCESS_KEY "${{ secrets.MINIO_ROOT_USER }}"
+            upsert_env MINIO_SECRET_KEY "${{ secrets.MINIO_ROOT_PASSWORD }}"
+            upsert_env SECRET_KEY "${{ secrets.ADMIN_API_SECRET_KEY }}"
+            upsert_env ADMIN_EMAIL "${{ secrets.ADMIN_EMAIL }}"
+            upsert_env ADMIN_PASSWORD_HASH "${{ secrets.ADMIN_PASSWORD_HASH }}"
+
+            # Keep POSTGRES_URL in sync with DATABASE_URL when only one was set
+            DB_URL=$(grep -E '^DATABASE_URL=' /docker/JobHunter/.env | head -1 | cut -d= -f2- || true)
+            PG_URL=$(grep -E '^POSTGRES_URL=' /docker/JobHunter/.env | head -1 | cut -d= -f2- || true)
+            if [ -n "$DB_URL" ] && [ -z "$PG_URL" ]; then
+              upsert_env POSTGRES_URL "$DB_URL"
             fi
 
-            # Write JobHunter .env from GitHub secrets (no leading spaces)
-            cat > /docker/JobHunter/.env <<EOF
-            DATABASE_URL=${JH_DB_URL}
-            DB_POOL_SIZE=5
-            DB_MAX_OVERFLOW=10
-            USE_ALEMBIC_MIGRATIONS=true
-            POSTGRES_USER=${JH_PG_USER}
-            POSTGRES_PASSWORD=${JH_PG_PASS}
-            POSTGRES_DB=${JH_PG_DB}
-            POSTGRES_URL=${JH_DB_URL}
-            API_HOST=0.0.0.0
-            API_PORT=8000
-            LOG_LEVEL=INFO
-            SECRET_KEY_APPROVAL=${{ secrets.SECRET_KEY_APPROVAL }}
-            APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}
-            APPROVAL_KEYS=${{ secrets.APPROVAL_KEYS }}
-            APPROVAL_ACTIVE_KEY=k1
-            INTERNAL_API_KEY=${{ secrets.INTERNAL_API_KEY }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_ALGORITHM=HS256
-            JWT_EXPIRY_MINUTES=15
-            REFRESH_TOKEN_EXPIRY_DAYS=30
-            MIN_PASSWORD_LENGTH=8
-            COOKIE_SECURE=true
-            COOKIE_DOMAIN=.myjobhunter.in
-            MAX_APPLICATIONS_PER_DAY=10
-            MAX_VARIANTS_PER_SESSION=15
-            MAX_VARIANTS_TOTAL=50
-            LLM_PRIMARY_PROVIDER=anthropic
-            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            MAIL_BRIDGE_URL=https://app.myjobhunter.in/mailbridge
-            MAIL_BRIDGE_API_KEY=${{ secrets.MAIL_BRIDGE_API_KEY }}
-            MAILBRIDGE_WEBHOOK_SECRET=${{ secrets.MAILBRIDGE_WEBHOOK_SECRET }}
-            MAILBRIDGE_WEBHOOK_ID=${{ secrets.MAILBRIDGE_WEBHOOK_ID }}
-            MINIO_ENDPOINT=minio:9000
-            MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
-            MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
-            MINIO_ACCESS_KEY=${{ secrets.MINIO_ROOT_USER }}
-            MINIO_SECRET_KEY=${{ secrets.MINIO_ROOT_PASSWORD }}
-            MINIO_BUCKET_NAME=jobhunter-resumes
-            MINIO_AVATAR_BUCKET_NAME=jobhunter-avatars
-            MINIO_SECURE=false
-            MINIO_EXTERNAL_ENDPOINT=app.myjobhunter.in
-            MINIO_EXTERNAL_SECURE=true
-            REDIS_URL=redis://redis:6379/0
-            OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-            NEXT_PUBLIC_API_BASE_URL=same-origin
-            NEXT_PUBLIC_APP_URL=https://app.myjobhunter.in
-            NEXT_PUBLIC_MINIO_URL=https://app.myjobhunter.in
-            INTERNAL_API_URL=http://jobhunter-api:8000
-            NEXT_PUBLIC_ADMIN_API_URL=https://admin-api.myjobhunter.in
-            ADMIN_API_INTERNAL_URL=http://admin-api:8003
-            CORS_ORIGINS=https://app.myjobhunter.in,http://localhost:3000,http://localhost:5173
-            FRONTEND_URL=https://admin.myjobhunter.in
-            SECRET_KEY=${{ secrets.ADMIN_API_SECRET_KEY }}
-            ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
-            ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
-            EOF
-
-            # Strip accidental leading whitespace from heredoc/YAML
-            sed -i 's/^[[:space:]]*//' /docker/JobHunter/.env
-
-            # Ensure critical secrets exist (GitHub secret → .deploy-secrets → generate)
+            # Fallback if critical secrets are still short (should not happen with env.example)
             touch /docker/JobHunter/.deploy-secrets
             ensure_secret() {
               KEY="$1"
@@ -149,24 +126,19 @@ jobs:
               if [ "${#VAL}" -ge "$MINLEN" ]; then
                 return 0
               fi
-              if grep -qE "^${KEY}=.{$MINLEN,}" /docker/JobHunter/.deploy-secrets 2>/dev/null; then
+              if grep -qE "^${KEY}=" /docker/JobHunter/.deploy-secrets 2>/dev/null; then
                 VAL=$(grep -E "^${KEY}=" /docker/JobHunter/.deploy-secrets | head -1 | cut -d= -f2-)
                 echo "Using persisted ${KEY} from .deploy-secrets"
               else
                 VAL=$(openssl rand -hex 32)
-                # upsert into .deploy-secrets
                 if grep -qE "^${KEY}=" /docker/JobHunter/.deploy-secrets; then
                   sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" /docker/JobHunter/.deploy-secrets
                 else
                   echo "${KEY}=${VAL}" >> /docker/JobHunter/.deploy-secrets
                 fi
-                echo "WARNING: generated ${KEY} (set GitHub Actions secret '${KEY}' for stable tokens across rebuilds)"
+                echo "WARNING: generated ${KEY} (update env.example or GitHub secret '${KEY}')"
               fi
-              if grep -qE "^${KEY}=" /docker/JobHunter/.env; then
-                sed -i "s|^${KEY}=.*|${KEY}=${VAL}|" /docker/JobHunter/.env
-              else
-                echo "${KEY}=${VAL}" >> /docker/JobHunter/.env
-              fi
+              upsert_env "$KEY" "$VAL"
             }
 
             ensure_secret SECRET_KEY_APPROVAL 32
@@ -175,14 +147,17 @@ jobs:
             ensure_secret INTERNAL_API_KEY 16
             ensure_secret SECRET_KEY 32
 
-            # If APPROVAL_TOKEN_SECRET still empty somehow, copy SECRET_KEY_APPROVAL
             ATS=$(grep -E '^APPROVAL_TOKEN_SECRET=' /docker/JobHunter/.env | cut -d= -f2-)
             SKA=$(grep -E '^SECRET_KEY_APPROVAL=' /docker/JobHunter/.env | cut -d= -f2-)
             if [ "${#ATS}" -lt 32 ] && [ "${#SKA}" -ge 32 ]; then
-              sed -i "s|^APPROVAL_TOKEN_SECRET=.*|APPROVAL_TOKEN_SECRET=${SKA}|" /docker/JobHunter/.env
+              upsert_env APPROVAL_TOKEN_SECRET "$SKA"
             fi
 
-            echo "Secret lengths: APPROVAL_TOKEN_SECRET=$(grep -E '^APPROVAL_TOKEN_SECRET=' .env | cut -d= -f2- | wc -c) JWT_SECRET=$(grep -E '^JWT_SECRET=' .env | cut -d= -f2- | wc -c)"
+            echo "--- .env from env.example (key lengths) ---"
+            for k in DATABASE_URL JWT_SECRET SECRET_KEY_APPROVAL APPROVAL_TOKEN_SECRET INTERNAL_API_KEY REDIS_URL POSTGRES_URL; do
+              v=$(grep -E "^${k}=" /docker/JobHunter/.env | head -1 | cut -d= -f2- || true)
+              echo "${k} len=${#v}"
+            done
 
             docker compose -p jobhunter \
               -f DOCKER-COMPOSE.yml \
