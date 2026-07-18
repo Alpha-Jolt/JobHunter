@@ -57,6 +57,7 @@ services:
 #   GATEWAY_PORT=3009
 #   WEBAPP_PORT=3010
 #   FRONTEND_URL=https://app.myjobhunter.in/mailbridge
-#   API_GATEWAY_URL=https://app.myjobhunter.in/mailbridge
+#   API_GATEWAY_URL=http://gateway:3009
+#   NEXT_PUBLIC_BASE_PATH=/mailbridge
 # Deploy command:
 #   docker compose -p mailbridge -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build

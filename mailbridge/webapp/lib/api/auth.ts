@@ -1,10 +1,10 @@
 import { apiClient } from './client'
+import { withBasePath } from '@/lib/base-path'
 import type { AuthUser } from '@/lib/types/api'
 
 export interface LoginInput { email: string; password: string }
 export interface RegisterInput { email: string; password: string; workspace_name: string }
 
-// Called from Next.js API routes (server-side) — passes token from cookie
 export async function loginBackend(input: LoginInput, token?: string) {
   return apiClient.post<{ success: boolean; token: string; expires_at: string }>(
     '/auth/login', input, { token }
@@ -33,11 +33,10 @@ export async function upgradeBackend(token: string) {
   )
 }
 
-// Client-side: calls Next.js API route /api/auth/me
 export async function getMe(): Promise<AuthUser> {
-  const res = await fetch('/api/auth/me', {
+  const res = await fetch(withBasePath('/api/auth/me'), {
     credentials: 'include',
-    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
   })
   if (!res.ok) throw new Error('Not authenticated')
   const data = await res.json()

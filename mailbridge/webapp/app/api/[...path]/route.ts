@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const GATEWAY = process.env.API_GATEWAY_URL ?? 'http://localhost:3009'
+const BASE_PATH = (process.env.NEXT_PUBLIC_BASE_PATH ?? '').replace(/\/$/, '')
 
 async function proxy(req: NextRequest): Promise<NextResponse> {
   const token = req.cookies.get('mb_token')?.value
@@ -12,17 +13,20 @@ async function proxy(req: NextRequest): Promise<NextResponse> {
   }
 
   const { pathname, search } = new URL(req.url)
-  const upstream = `${GATEWAY}${pathname}${search}`
+  const upstreamPath =
+    BASE_PATH && pathname.startsWith(BASE_PATH)
+      ? pathname.slice(BASE_PATH.length) || '/'
+      : pathname
+  const upstream = `${GATEWAY}${upstreamPath}${search}`
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'X-Requested-With': 'XMLHttpRequest',
   }
 
-  const body = req.method !== 'GET' && req.method !== 'HEAD'
-    ? await req.text()
-    : undefined
+  const body =
+    req.method !== 'GET' && req.method !== 'HEAD' ? await req.text() : undefined
 
   const res = await fetch(upstream, {
     method: req.method,

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Zap } from 'lucide-react'
 import { useAuthStore } from '@/lib/store/authStore'
 import { getMe } from '@/lib/api/auth'
+import { withBasePath } from '@/lib/base-path'
 
 const schema = z.object({
   workspace_name: z.string().min(2, 'Min 2 characters'),
@@ -24,7 +25,7 @@ export default function RegisterPage() {
   })
 
   async function onSubmit(data: FormData) {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(withBasePath('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

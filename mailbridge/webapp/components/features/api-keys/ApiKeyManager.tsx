@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { PageHeader } from '../../shared/PageHeader'
 import { EmptyState } from '../../shared/EmptyState'
 import { KeyRound, Plus, Trash2, Copy, CheckCircle2, AlertTriangle, Clock } from 'lucide-react'
+import { withBasePath } from '@/lib/base-path'
 
 interface ApiKey {
   api_key_id: string
@@ -38,7 +39,7 @@ export function ApiKeyManager() {
 
   async function fetchKeys() {
     try {
-      const res = await fetch('/api/auth/api-keys', {
+      const res = await fetch(withBasePath('/api/auth/api-keys'), {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
       if (!res.ok) throw new Error('Failed to fetch API keys')
@@ -65,7 +66,7 @@ export function ApiKeyManager() {
         expires_at = d.toISOString()
       }
 
-      const res = await fetch('/api/auth/api-keys', {
+      const res = await fetch(withBasePath('/api/auth/api-keys'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -97,7 +98,7 @@ export function ApiKeyManager() {
     if (!confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) return
     setRevokingId(id)
     try {
-      const res = await fetch(`/api/auth/api-keys/${id}`, {
+      const res = await fetch(withBasePath(`/api/auth/api-keys/${id}`), {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })

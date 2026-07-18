@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { useAuthStore } from '@/lib/store/authStore'
+import { withBasePath } from '@/lib/base-path'
 
 export function Topbar() {
   const router = useRouter()
   const clear = useAuthStore(s => s.clear)
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch(withBasePath('/api/auth/logout'), { method: 'POST', credentials: 'include' })
     clear()
     router.push('/login')
   }

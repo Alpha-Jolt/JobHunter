@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Zap } from 'lucide-react'
+import { withBasePath } from '@/lib/base-path'
 import { useAuthStore } from '@/lib/store/authStore'
 import { getMe } from '@/lib/api/auth'
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
   })
 
   async function onSubmit(data: FormData) {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(withBasePath('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

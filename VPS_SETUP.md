@@ -53,6 +53,37 @@ nano .env   # paste/fill secrets yourself — CI never creates or edits .env
 GitHub secrets needed for deploy: **`HOST_IP`**, **`HOST_USER`**, **`SSH_PRIVATE_KEY`** only.  
 Everything else lives on the VPS in `/docker/JobHunter/.env` (and `mailbridge/.env` if you use Mail-Bridge).
 
+### Mail-Bridge (`/mailbridge`) — required once
+
+```bash
+cd /docker/JobHunter/mailbridge
+cp .env.example .env
+nano .env
+```
+
+Critical values:
+
+```env
+FRONTEND_URL=https://app.myjobhunter.in/mailbridge
+API_GATEWAY_URL=http://gateway:3009
+NEXT_PUBLIC_BASE_PATH=/mailbridge
+GATEWAY_PORT=3009
+WEBAPP_PORT=3010
+```
+
+Then rebuild + refresh nginx:
+
+```bash
+cd /docker/JobHunter/mailbridge
+docker compose -p mailbridge -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build
+
+sudo cp /docker/JobHunter/deploy/nginx-app.myjobhunter.in.conf /etc/nginx/sites-available/app.myjobhunter.in
+sudo nginx -t && sudo systemctl reload nginx
+
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3010/mailbridge/
+curl -sS -o /dev/null -w '%{http_code}\n' https://app.myjobhunter.in/mailbridge/
+```
+
 ### Required production values (must match this shape)
 
 ```env

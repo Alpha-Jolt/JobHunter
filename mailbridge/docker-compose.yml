@@ -257,13 +257,17 @@ services:
     build:
       context: ./webapp
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/mailbridge}
     container_name: mb-webapp
     ports:
       - ${WEBAPP_PORT:-3010}:3010
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 3010
+      # Internal Docker DNS — never the public URL
       API_GATEWAY_URL: ${API_GATEWAY_URL:-http://gateway:3009}
+      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/mailbridge}
     depends_on:
       - gateway
   website:

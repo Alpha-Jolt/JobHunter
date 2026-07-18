@@ -11,6 +11,7 @@ import Image from 'next/image'
 import { cn } from '@/lib/utils/cn'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useAuthStore } from '@/lib/store/authStore'
+import { withBasePath } from '@/lib/base-path'
 
 const NAV = [
   { href: '/',             label: 'Dashboard',    icon: LayoutDashboard, ownerOnly: false },
@@ -33,7 +34,7 @@ export function Sidebar() {
   async function handleUpgrade() {
     try {
       setIsUpgrading(true)
-      const res = await fetch('/api/auth/upgrade', {
+      const res = await fetch(withBasePath('/api/auth/upgrade'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       })
