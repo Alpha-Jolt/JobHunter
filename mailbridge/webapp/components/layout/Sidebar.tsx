@@ -5,9 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Mail, FileText, Key, Webhook,
-  Users, Settings, Inbox
+  Users, Settings, Inbox, Zap
 } from 'lucide-react'
-import Image from 'next/image'
 import { cn } from '@/lib/utils/cn'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useAuthStore } from '@/lib/store/authStore'
@@ -57,7 +56,9 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 h-full w-56 border-r border-[var(--border)] bg-[var(--bg)] flex flex-col z-20">
       {/* Logo */}
       <div className="flex items-center gap-2 px-5 py-5 border-b border-[var(--border)]">
-        <Image src="/logo.png" alt="Mail-Bridge" width={28} height={28} className="rounded-lg" />
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent">
+          <Zap className="h-4 w-4 text-white" />
+        </div>
         <span className="font-semibold tracking-tight text-[var(--text)]">Mail-Bridge</span>
       </div>
 

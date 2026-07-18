@@ -3,10 +3,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Subpath on app.myjobhunter.in/mailbridge — baked into Next build
+# Subpath on app.myjobhunter.in/mailbridge — MUST be present at build time (inlined into client JS)
 ARG NEXT_PUBLIC_BASE_PATH=/mailbridge
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
-RUN npm run build
+# Bust stale caches when basePath wiring changes
+RUN echo "basePath=${NEXT_PUBLIC_BASE_PATH}" > /tmp/basepath.stamp && npm run build
 
 FROM node:18-alpine
 WORKDIR /app
