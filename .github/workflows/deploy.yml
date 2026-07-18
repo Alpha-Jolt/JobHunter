@@ -83,7 +83,7 @@ jobs:
             API_PORT=8000
             LOG_LEVEL=INFO
             SECRET_KEY_APPROVAL=${{ secrets.SECRET_KEY_APPROVAL }}
-            APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET }}
+            APPROVAL_TOKEN_SECRET=${{ secrets.APPROVAL_TOKEN_SECRET != '' && secrets.APPROVAL_TOKEN_SECRET || secrets.SECRET_KEY_APPROVAL }}
             APPROVAL_KEYS=${{ secrets.APPROVAL_KEYS }}
             APPROVAL_ACTIVE_KEY=k1
             INTERNAL_API_KEY=${{ secrets.INTERNAL_API_KEY }}
@@ -129,6 +129,20 @@ jobs:
             ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
             POSTGRES_URL=${{ secrets.DATABASE_URL }}
             EOF
+
+            # Guard: empty secrets must not reach the API (crash → Cloudflare 502)
+            if [ "$(grep -E '^APPROVAL_TOKEN_SECRET=.{32,}' .env | wc -l)" -lt 1 ]; then
+              echo "ERROR: APPROVAL_TOKEN_SECRET / SECRET_KEY_APPROVAL missing or < 32 chars in GitHub secrets"
+              exit 1
+            fi
+            if [ "$(grep -E '^JWT_SECRET=.{32,}' .env | wc -l)" -lt 1 ]; then
+              echo "ERROR: JWT_SECRET missing or < 32 chars in GitHub secrets"
+              exit 1
+            fi
+            if [ "$(grep -E '^INTERNAL_API_KEY=.+' .env | wc -l)" -lt 1 ]; then
+              echo "ERROR: INTERNAL_API_KEY is empty in GitHub secrets"
+              exit 1
+            fi
 
             # Fail fast if API image cannot start (avoids silent Cloudflare 502)
             docker compose -p jobhunter \

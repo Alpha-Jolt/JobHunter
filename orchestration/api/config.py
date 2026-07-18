@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,22 +29,37 @@ class APIConfig(BaseSettings):
     api_port: int = Field(default=8000, alias="API_PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     secret_key_approval: str = Field(
-        default="changeme-32-char-secret-key-here", alias="SECRET_KEY_APPROVAL"
+        default="changeme-32-char-secret-key-here!", alias="SECRET_KEY_APPROVAL"
     )
     approval_token_secret: str = Field(
-        default="changeme-32-char-secret-key-here", alias="APPROVAL_TOKEN_SECRET"
+        default="changeme-32-char-secret-key-here!", alias="APPROVAL_TOKEN_SECRET"
     )
     max_applications_per_day: int = Field(default=10, alias="MAX_APPLICATIONS_PER_DAY")
     max_variants_per_session: int = Field(default=15, alias="MAX_VARIANTS_PER_SESSION")
     max_variants_total: int = Field(default=50, alias="MAX_VARIANTS_TOTAL")
     internal_api_key: str = Field(alias="INTERNAL_API_KEY")
 
-    @field_validator("approval_token_secret")
+    @field_validator("approval_token_secret", "secret_key_approval", mode="before")
     @classmethod
-    def _validate_approval_secret(cls, v: str) -> str:
-        if len(v) < 32:
-            raise ValueError("APPROVAL_TOKEN_SECRET must be at least 32 characters")
+    def _empty_str_to_default(cls, v: object) -> object:
+        # Empty GitHub secrets become "" and would override defaults — treat as unset
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
         return v
+
+    @model_validator(mode="after")
+    def _ensure_approval_secrets(self) -> "APIConfig":
+        # Fall back: APPROVAL_TOKEN_SECRET ← SECRET_KEY_APPROVAL when missing/short
+        if len(self.approval_token_secret) < 32:
+            if len(self.secret_key_approval) >= 32:
+                object.__setattr__(self, "approval_token_secret", self.secret_key_approval)
+            else:
+                raise ValueError(
+                    "APPROVAL_TOKEN_SECRET (or SECRET_KEY_APPROVAL) must be at least 32 characters"
+                )
+        if len(self.secret_key_approval) < 32:
+            raise ValueError("SECRET_KEY_APPROVAL must be at least 32 characters")
+        return self
 
 
 class ServicePaths(BaseSettings):
