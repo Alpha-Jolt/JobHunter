@@ -141,8 +141,7 @@ services:
     environment:
       INTERNAL_API_URL: ${INTERNAL_API_URL:-http://jobhunter-api:8000}
     depends_on:
-      jobhunter-api:
-        condition: service_healthy
+      - jobhunter-api
     networks:
       - jobhunter_network
 

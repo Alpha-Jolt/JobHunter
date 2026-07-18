@@ -11,7 +11,7 @@ class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = Field(
-        default="postgresql+asyncpg://jobhunter:jobhunter@localhost:5432/jobhunter",
+        default="postgresql+asyncpg://jobhunter:jobhunter@postgres:5432/jobhunter",
         alias="DATABASE_URL",
     )
     db_pool_size: int = Field(default=10, alias="DB_POOL_SIZE")
@@ -20,6 +20,13 @@ class DatabaseConfig(BaseSettings):
         default=False,
         alias="USE_ALEMBIC_MIGRATIONS",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _empty_db_url(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
 
 
 class APIConfig(BaseSettings):
@@ -37,9 +44,16 @@ class APIConfig(BaseSettings):
     max_applications_per_day: int = Field(default=10, alias="MAX_APPLICATIONS_PER_DAY")
     max_variants_per_session: int = Field(default=15, alias="MAX_VARIANTS_PER_SESSION")
     max_variants_total: int = Field(default=50, alias="MAX_VARIANTS_TOTAL")
-    internal_api_key: str = Field(alias="INTERNAL_API_KEY")
+    internal_api_key: str = Field(
+        default="dev-internal-api-key-change-me-32ch", alias="INTERNAL_API_KEY"
+    )
 
-    @field_validator("approval_token_secret", "secret_key_approval", mode="before")
+    @field_validator(
+        "approval_token_secret",
+        "secret_key_approval",
+        "internal_api_key",
+        mode="before",
+    )
     @classmethod
     def _empty_str_to_default(cls, v: object) -> object:
         # Empty GitHub secrets become "" and would override defaults — treat as unset
@@ -59,6 +73,8 @@ class APIConfig(BaseSettings):
                 )
         if len(self.secret_key_approval) < 32:
             raise ValueError("SECRET_KEY_APPROVAL must be at least 32 characters")
+        if len(self.internal_api_key) < 16:
+            raise ValueError("INTERNAL_API_KEY must be at least 16 characters")
         return self
 
 
@@ -94,8 +110,6 @@ class MailConfig(BaseSettings):
     mailbridge_webhook_id: Optional[str] = Field(default=None, alias="MAILBRIDGE_WEBHOOK_ID")
 
 
-
-
 class AuthConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -108,6 +122,13 @@ class AuthConfig(BaseSettings):
     # e.g. ".myjobhunter.in" so app + api subdomains share refresh_token
     cookie_domain: str = Field(default="", alias="COOKIE_DOMAIN")
 
+    @field_validator("jwt_secret", mode="before")
+    @classmethod
+    def _empty_jwt_to_default(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
+
     @field_validator("jwt_secret")
     @classmethod
     def _validate_jwt_secret(cls, v: str) -> str:
@@ -119,7 +140,7 @@ class AuthConfig(BaseSettings):
 class MinIOConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    minio_endpoint: str = Field(default="localhost:9000", alias="MINIO_ENDPOINT")
+    minio_endpoint: str = Field(default="minio:9000", alias="MINIO_ENDPOINT")
     minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
@@ -128,11 +149,12 @@ class MinIOConfig(BaseSettings):
     minio_external_endpoint: str | None = Field(default=None, alias="MINIO_EXTERNAL_ENDPOINT")
     minio_external_secure: bool | None = Field(default=None, alias="MINIO_EXTERNAL_SECURE")
 
+
 class RedisConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    
-    redis_url: str = Field(default="redis://jobhunter-redis-1:6379/0", alias="REDIS_URL")
 
+    # Compose service name is `redis` (container may be jobhunter-redis-1)
+    redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
 class OtelConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     otel_exporter_otlp_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
