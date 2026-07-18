@@ -90,8 +90,54 @@ class ScraperService:
         Job = _db_models.Job
         CareerJob = _db_models.CareerJob
         Company = _db_models.Company
+        ApiSourcedJob = _db_models.ApiSourcedJob
         
-        from sqlalchemy import union_all, literal_column, cast, String, Numeric
+        from sqlalchemy import union_all, literal_column, cast, String, Numeric, Integer
+        
+        # Priority 1: ApiSourcedJob
+        api_stmt = select(
+            ApiSourcedJob.job_id.label("job_id"),
+            ApiSourcedJob.source.label("source"),
+            ApiSourcedJob.external_id.label("external_id"),
+            ApiSourcedJob.title.label("title"),
+            ApiSourcedJob.company_name.label("company_name"),
+            ApiSourcedJob.company_domain.label("company_domain"),
+            ApiSourcedJob.location.label("location"),
+            cast(literal_column("''"), String(50)).label("remote_type"),
+            cast(literal_column("null"), Numeric(12, 2)).label("salary_min"),
+            cast(literal_column("null"), Numeric(12, 2)).label("salary_max"),
+            cast(literal_column("null"), Integer).label("experience_min"),
+            cast(literal_column("null"), Integer).label("experience_max"),
+            ApiSourcedJob.description.label("description"),
+            cast(literal_column("'{}'"), String).label("skills_required"),
+            cast(literal_column("''"), String(50)).label("job_type"),
+            ApiSourcedJob.apply_email.label("apply_email"),
+            cast(literal_column("'unknown'"), String(20)).label("email_trust"),
+            ApiSourcedJob.apply_url.label("apply_url"),
+            ApiSourcedJob.created_at.label("posted_at"),
+            ApiSourcedJob.created_at.label("scraped_at"),
+            ApiSourcedJob.last_seen_at.label("last_seen_at"),
+            ApiSourcedJob.status.label("status"),
+            literal_column("1").label("sort_priority")
+        ).where(ApiSourcedJob.status != "closed")
+
+        if source and source not in ("apify", "hunter"):
+            api_stmt = api_stmt.where(literal_column("1") == literal_column("0"))
+        elif source in ("apify", "hunter"):
+            api_stmt = api_stmt.where(ApiSourcedJob.source == source)
+
+        if search:
+            from sqlalchemy import or_
+            search_term = f"%{search}%"
+            api_stmt = api_stmt.where(
+                or_(
+                    ApiSourcedJob.title.ilike(search_term),
+                    ApiSourcedJob.company_name.ilike(search_term),
+                    ApiSourcedJob.description.ilike(search_term)
+                )
+            )
+
+        # Priority 2: Job
         
         j_stmt = select(
             Job.job_id.label("job_id"),
@@ -115,7 +161,8 @@ class ScraperService:
             Job.posted_at.label("posted_at"),
             Job.scraped_at.label("scraped_at"),
             Job.last_seen_at.label("last_seen_at"),
-            Job.status.label("status")
+            Job.status.label("status"),
+            literal_column("2").label("sort_priority")
         ).where(Job.status != "closed")
 
         if source and source != "career_page":
@@ -159,7 +206,8 @@ class ScraperService:
                 CareerJob.posted_at.label("posted_at"),
                 CareerJob.scraped_at.label("scraped_at"),
                 CareerJob.last_seen_at.label("last_seen_at"),
-                CareerJob.status.label("status")
+                CareerJob.status.label("status"),
+                literal_column("3").label("sort_priority")
             ).select_from(
                 CareerJob.__table__.join(Company.__table__, CareerJob.company_id == Company.company_id)
             ).where(CareerJob.status != "closed")
@@ -180,13 +228,15 @@ class ScraperService:
                 
             stmts.append(cj_stmt)
 
+        stmts = [api_stmt] + stmts
+
         union_stmt = union_all(*stmts)
         subq = union_stmt.subquery()
         
         count_stmt = select(func.count()).select_from(subq)
         total = (await self._session.execute(count_stmt)).scalar() or 0
         
-        stmt = select(subq).order_by(subq.c.last_seen_at.desc()).limit(limit).offset(offset)
+        stmt = select(subq).order_by(subq.c.sort_priority.asc(), subq.c.last_seen_at.desc()).limit(limit).offset(offset)
         result = await self._session.execute(stmt)
         
         return [_orm_job_to_record(row) for row in result.all()], total

@@ -35,6 +35,10 @@ async def process_task(task_data: dict, r: redis.Redis):
         await _handle_career_page_scrape(task_id, payload, r, status_key)
     elif task_type == "ats_api_refresh":
         await _handle_ats_api_refresh(task_id, payload, r, status_key)
+    elif task_type == "hunter_enrich":
+        await _handle_hunter_enrich(task_id, payload, r, status_key)
+    elif task_type == "apify_scrape":
+        await _handle_apify_scrape(task_id, payload, r, status_key)
     else:
         # Legacy scrape task
         runner = DevModeRunner()
@@ -702,6 +706,154 @@ async def _upsert_career_jobs(jobs: list[dict], session) -> int:
             )
 
     return upserted
+
+
+async def _handle_hunter_enrich(
+    task_id: str, payload: dict, r, status_key: str
+) -> None:
+    """Handle Hunter.io enrichment of company domains."""
+    from scraper.core.rate_limiter import RateLimiter
+    from scraper.core.retry_handler import RetryHandler
+    from scraper.sources.hunter_scraper import HunterScraper
+    from scraper.output.api_jobs_output import ApiJobsOutputAdapter
+    from sqlalchemy import text
+
+    await r.set(status_key, json.dumps({"state": "running", "emails_found": 0, "error": None}))
+
+    try:
+        rate_limiter = RateLimiter()
+        retry_handler = RetryHandler()
+        scraper = HunterScraper(rate_limiter, retry_handler)
+        await scraper.initialize()
+        
+        domains = payload.get("domains", [])
+        
+        if not domains:
+            # If no domains provided, fetch all unenriched companies from DB
+            async with get_session() as session:
+                result = await session.execute(
+                    text("SELECT apex_domain FROM companies WHERE crawl_status != 'enriched'")
+                )
+                domains = [row[0] for row in result.fetchall()]
+
+        jobs = await scraper.scrape(keywords=[], locations=[], domains=domains)
+        
+        if jobs:
+            output = ApiJobsOutputAdapter()
+            await output.save_jobs(jobs)
+            
+            # Update companies with these emails
+            async with get_session() as session:
+                for job in jobs:
+                    if job.apply_email_raw:
+                        await session.execute(
+                            text("""
+                                UPDATE companies SET 
+                                career_emails = array_append(career_emails, :email)
+                                WHERE apex_domain = :domain AND NOT (:email = ANY(career_emails))
+                            """),
+                            {"email": job.apply_email_raw, "domain": job.company_domain}
+                        )
+                await session.commit()
+
+        await scraper.close()
+        
+        logger.info(f"Hunter enrich task {task_id} complete: {len(jobs)} emails found")
+        await r.set(status_key, json.dumps({
+            "state": "completed",
+            "emails_found": len(jobs),
+            "error": None,
+        }))
+        
+        # If payload specifies chain, queue up Apify
+        if payload.get("chain_apify"):
+            await r.lpush("scraper:tasks", json.dumps({
+                "task_id": f"apify_{task_id}",
+                "payload": {
+                    "type": "apify_scrape",
+                    "domains": domains,
+                    "actor_id": payload.get("actor_id", "apify/indeed-scraper")
+                }
+            }))
+            
+    except Exception as e:
+        logger.error(f"Hunter enrich task {task_id} failed: {e}", exc_info=True)
+        await r.set(status_key, json.dumps({
+            "state": "failed",
+            "emails_found": 0,
+            "error": str(e),
+        }))
+
+
+async def _handle_apify_scrape(
+    task_id: str, payload: dict, r, status_key: str
+) -> None:
+    """Handle Apify scraping of domains."""
+    from scraper.core.rate_limiter import RateLimiter
+    from scraper.core.retry_handler import RetryHandler
+    from scraper.sources.apify_scraper import ApifyScraper
+    from scraper.output.api_jobs_output import ApiJobsOutputAdapter
+    from sqlalchemy import text
+
+    await r.set(status_key, json.dumps({"state": "running", "jobs_found": 0, "error": None}))
+
+    try:
+        rate_limiter = RateLimiter()
+        retry_handler = RetryHandler()
+        scraper = ApifyScraper(rate_limiter, retry_handler)
+        await scraper.initialize()
+        
+        domains = payload.get("domains", [])
+        actor_id = payload.get("actor_id", "apify/indeed-scraper")
+        
+        if not domains:
+            # If no domains provided, fetch all enriched companies from DB
+            async with get_session() as session:
+                result = await session.execute(
+                    text("SELECT apex_domain FROM companies WHERE crawl_status = 'enriched'")
+                )
+                domains = [row[0] for row in result.fetchall()]
+
+        jobs = await scraper.scrape(
+            keywords=payload.get("keywords", []),
+            locations=payload.get("locations", []),
+            domains=domains,
+            actor_id=actor_id
+        )
+        
+        if jobs:
+            # Resolve company_id based on company_domain
+            async with get_session() as session:
+                result = await session.execute(
+                    text("SELECT apex_domain, company_id FROM companies WHERE apex_domain = ANY(:domains)"),
+                    {"domains": list(set(j.company_domain for j in jobs if j.company_domain))}
+                )
+                domain_map = {row[0]: str(row[1]) for row in result.fetchall()}
+                
+                for job in jobs:
+                    if job.company_domain in domain_map:
+                        job.extra_raw["resolved_company_id"] = domain_map[job.company_domain]
+            
+            output = ApiJobsOutputAdapter()
+            await output.save_jobs(jobs)
+
+        await scraper.close()
+        
+        logger.info(f"Apify scrape task {task_id} complete: {len(jobs)} jobs found")
+        await r.set(status_key, json.dumps({
+            "state": "completed",
+            "jobs_found": len(jobs),
+            "error": None,
+        }))
+            
+    except Exception as e:
+        logger.error(f"Apify scrape task {task_id} failed: {e}", exc_info=True)
+        await r.set(status_key, json.dumps({
+            "state": "failed",
+            "jobs_found": 0,
+            "error": str(e),
+        }))
+
 
 
 if __name__ == "__main__":

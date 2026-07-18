@@ -40,6 +40,10 @@ export default function ProtectedLayout({
             <Briefcase size={20} />
             Career Jobs
           </a>
+          <a href="/dashboard/api-scraper" className="flex items-center gap-3 p-3 rounded text-gray-400 hover:bg-gray-800 hover:text-white">
+            <LayoutDashboard size={20} />
+            API Scrapers
+          </a>
         </nav>
         <div className="p-4 border-t border-gray-800">
           <button 

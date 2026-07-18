@@ -1,0 +1,64 @@
+---
+title: Webhooks
+description: Receive real-time email delivery events
+lastUpdated: 2026-05-23
+order: 6
+---
+
+## Overview
+
+Webhooks deliver real-time events to your server when emails are sent, fail, or bounce. Payloads are signed with HMAC-SHA256 using your webhook secret.
+
+## Register a webhook
+
+```http
+POST /api/webhooks
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "url": "https://myapp.com/webhooks/mail",
+  "events": ["email.sent", "email.failed"],
+  "secret": "my-signing-secret"
+}
+```
+
+## Available events
+
+| Event | Triggered when |
+|---|---|
+| `email.sent` | Email successfully delivered to provider |
+| `email.failed` | All retry attempts exhausted |
+| `email.bounced` | Provider reports a bounce |
+
+## Payload format
+
+```json
+{
+  "event": "email.sent",
+  "email_id": "uuid",
+  "to_email": "recipient@example.com",
+  "timestamp": "2026-05-23T10:00:00Z"
+}
+```
+
+## Verifying signatures
+
+```javascript
+const crypto = require('crypto')
+
+function verifySignature(payload, signature, secret) {
+  const expected = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex')
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  )
+}
+```
+
+## Retry policy
+
+Failed deliveries are retried with exponential backoff: 1s, 2s, 4s, 8s, 16s (max 5 attempts).

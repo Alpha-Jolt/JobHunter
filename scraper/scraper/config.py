@@ -61,6 +61,16 @@ class Config(BaseSettings):
     use_registry: bool = False
     registry_path: str = "registries/jobs.json"
 
+    # --- Hunter.io ---
+    hunter_api_key: str = ""
+    hunter_rate_limit: float = Field(default=0.5, gt=0)
+
+    # --- Apify ---
+    apify_api_token: str = ""
+    apify_rate_limit: float = Field(default=2.0, gt=0)
+    apify_run_timeout_seconds: int = Field(default=300, ge=30)
+    apify_poll_interval_seconds: int = Field(default=5, ge=1)
+
     # --- Company Discovery — data.gov.in open API -----
     datagov_api_key: str = "579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b"
     datagov_msme_resource_id: str = "8b68ae56-84cf-4728-a0a6-1be11028dea7"

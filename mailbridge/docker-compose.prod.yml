@@ -1,0 +1,57 @@
+# Production overrides for Mail-Bridge on the JobHunter VPS.
+# Removes host port bindings for postgres and redis to avoid clashing
+# with JobHunter's postgres (:5432) and redis (:6379).
+# Gateway and webapp are bound to 127.0.0.1 so VPS nginx can proxy them.
+#
+# Usage:
+#   docker compose -p mailbridge \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     --env-file .env \
+#     up -d --build
+
+services:
+  # Keep DB/cache internal — no host port binding
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  # Gateway — VPS nginx routes app.myjobhunter.in/mailbridge/api/* here
+  gateway:
+    ports: !override
+      - "127.0.0.1:3009:3009"
+
+  # Webapp (management console) — VPS nginx routes /mailbridge/* here
+  webapp:
+    ports: !override
+      - "127.0.0.1:3010:3010"
+
+  # Internal services — no host exposure needed
+  auth:
+    ports: !reset []
+
+  credentials:
+    ports: !reset []
+
+  emails:
+    ports: !reset []
+
+  templates:
+    ports: !reset []
+
+  admin:
+    ports: !reset []
+
+  health:
+    ports: !reset []
+
+  dashboard:
+    ports: !reset []
+
+  webhooks:
+    ports: !reset []
+
+  website:
+    ports: !reset []

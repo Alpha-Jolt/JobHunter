@@ -1,0 +1,71 @@
+---
+title: Templates
+description: Create and manage reusable email templates
+lastUpdated: 2026-05-23
+order: 4
+---
+
+## Overview
+
+Templates use [Handlebars](https://handlebarsjs.com/) syntax for variable substitution. Every save creates a new version — you can roll back to any previous version.
+
+## Create a template
+
+```http
+POST /api/templates
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "name": "Welcome email",
+  "subject": "Welcome to {{workspace_name}}, {{name}}!",
+  "html": "<h1>Hi {{name}}</h1><p>Thanks for joining {{workspace_name}}.</p>"
+}
+```
+
+## List templates
+
+```http
+GET /api/templates
+Authorization: Bearer TOKEN
+```
+
+## Update a template
+
+```http
+PUT /api/templates/:id
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{
+  "subject": "Updated subject",
+  "html": "<p>Updated body</p>"
+}
+```
+
+Each update increments the version number and snapshots the previous version.
+
+## Version history
+
+```http
+GET /api/templates/:id/versions
+Authorization: Bearer TOKEN
+```
+
+## Rollback
+
+```http
+POST /api/templates/:id/rollback
+Authorization: Bearer TOKEN
+Content-Type: application/json
+
+{ "version": 2 }
+```
+
+## Handlebars syntax
+
+```handlebars
+{{name}}                    — simple variable
+{{#if premium}}...{{/if}}  — conditional
+{{#each items}}{{this}}{{/each}} — loop
+```

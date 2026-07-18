@@ -17,6 +17,7 @@ from orchestration.repositories.postgres_application_repository import (
     PostgresApplicationRepository,
 )
 from orchestration.services.mail_service import MailService
+from orchestration.services.mailbridge_client import MailBridgeClient
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -103,19 +104,25 @@ async def get_profile_repo(session: AsyncSession = Depends(get_db_session)):
 
 async def get_mail_service(
     settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(get_db_session),
     job_registry: PostgresJobRepository = Depends(get_job_registry),
     variant_registry: PostgresVariantRepository = Depends(get_variant_registry),
     application_log: PostgresApplicationRepository = Depends(get_application_log),
 ) -> MailService:
+    client = MailBridgeClient(
+        base_url=settings.mail.mail_bridge_url,
+        api_key=settings.mail.mail_bridge_api_key,
+    )
     s3_client = get_internal_s3_client(settings)
     return MailService(
-        mail_bridge_url=settings.mail.mail_bridge_url,
-        mail_bridge_api_key=settings.mail.mail_bridge_api_key,
+        mailbridge_client=client,
         job_registry=job_registry,
         variant_registry=variant_registry,
         application_log=application_log,
+        db_session=session,
         s3_client=s3_client,
         max_applications_per_day=settings.api.max_applications_per_day,
+        minio_bucket=settings.minio.minio_bucket,
     )
 
 # ── Auth dependencies (re-exported from auth module) ─────────────────────────

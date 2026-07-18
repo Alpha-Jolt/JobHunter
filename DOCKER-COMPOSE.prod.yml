@@ -49,3 +49,14 @@ services:
   admin-api:
     ports: !override
       - "127.0.0.1:8005:8003"
+
+# Mail-Bridge is deployed separately via mailbridge/docker-compose.yml
+# Its gateway (:3009) and webapp (:3010) are exposed on 127.0.0.1 by that compose.
+# VPS nginx routes /mailbridge/* on app.myjobhunter.in to those ports.
+# Ensure mailbridge/.env has:
+#   GATEWAY_PORT=3009
+#   WEBAPP_PORT=3010
+#   FRONTEND_URL=https://app.myjobhunter.in/mailbridge
+#   API_GATEWAY_URL=https://app.myjobhunter.in/mailbridge
+# Deploy command:
+#   docker compose -p mailbridge -f docker-compose.yml -f docker-compose.prod.yml --env-file .env up -d --build

@@ -1,0 +1,432 @@
+Mail-Bridge Business Source License (MB-BUSL) v1.0
+
+Licensor: Mail-Bridge Contributors and Copyright Holders
+Licensed Work: Mail-Bridge
+License Version: 1.0
+Effective Date: May 23, 2026
+
+1. Purpose
+
+Mail-Bridge is distributed under a source-available licensing model designed to:
+
+* Allow individuals and organizations to self-host and use the software.
+* Protect the commercial value of the project.
+* Prevent unauthorized SaaS reselling, hosting, cloning, or competitive commercialization.
+* Encourage community contributions while preserving sustainability for the maintainers.
+
+This license is inspired by the principles of the Business Source License (BUSL) model while being customized specifically for Mail-Bridge.
+
+2. Definitions
+
+For the purposes of this License:
+
+2.1 “Licensor”
+
+Means the copyright owner(s), maintainers, or contributors authorized to distribute Mail-Bridge.
+
+2.2 “Licensed Work”
+
+Means the Mail-Bridge software, including:
+
+* Source code
+* APIs
+* Containers
+* Build scripts
+* Infrastructure templates
+* Documentation
+* User interfaces
+* Plugins officially distributed by the Licensor
+* Any derivative works distributed under this License
+
+2.3 “Production Use”
+
+Means any use of the Licensed Work in an environment that:
+
+* Serves real users,
+* Sends actual email traffic,
+* Supports commercial operations,
+* Is used internally by an organization,
+* Is used for testing commercial workflows,
+* Is accessible outside a single developer machine.
+
+2.4 “Commercial Offering”
+
+Means providing the Licensed Work or derivative functionality:
+
+* As a hosted service,
+* As a managed service,
+* As a multi-tenant platform,
+* As a white-labeled solution,
+* As a commercial email platform,
+* As an API product,
+* As a SaaS/PaaS offering,
+* As part of a paid enterprise solution,
+* Or in any product where Mail-Bridge functionality is monetized.
+
+2.5 “Change Date”
+
+Means the date on which the Licensed Work automatically converts to the Change License described in Section 13.
+
+2.6 “Open Source Components”
+
+Means third-party dependencies that are separately licensed under their own licenses.
+
+3. Grant of Rights
+
+Subject to the terms and conditions of this License, the Licensor grants you a non-exclusive, non-transferable, revocable license to:
+
+* View the source code,
+* Download and build the software,
+* Modify the Licensed Work,
+* Self-host the Licensed Work,
+* Use the Licensed Work internally,
+* Deploy the Licensed Work for personal or organizational use,
+* Create internal customizations,
+* Submit contributions to the project.
+
+These rights are granted only if you fully comply with this License.
+
+4. Allowed Usage
+
+The following uses are explicitly permitted:
+
+4.1 Personal Self-Hosting
+
+Individuals may self-host Mail-Bridge for personal or non-commercial usage.
+
+4.2 Internal Organizational Usage
+
+Organizations may self-host Mail-Bridge internally for their own operational email workflows.
+
+Examples include:
+
+* Transactional email systems
+* Marketing email systems
+* Internal notification infrastructure
+* Multi-provider routing
+* SMTP orchestration
+* SES/SendGrid/Postmark/Mailgun integrations
+* Internal automation systems
+
+4.3 Internal Modifications
+
+You may modify the Licensed Work for internal usage.
+
+4.4 Development and Testing
+
+You may use the Licensed Work in staging, testing, CI/CD, QA, development, and non-production environments.
+
+5. Restrictions
+
+Unless explicitly authorized in writing by the Licensor, you MAY NOT:
+
+5.1 Offer Mail-Bridge as a Hosted Service
+
+You may not:
+
+* Sell hosted Mail-Bridge instances,
+* Operate a public Mail-Bridge cloud,
+* Provide Mail-Bridge as a SaaS platform,
+* Offer managed Mail-Bridge deployments,
+* Provide Mail-Bridge functionality as an API business,
+* Resell Mail-Bridge access commercially.
+
+5.2 Compete Commercially
+
+You may not use Mail-Bridge or derivative works to build or operate a competing commercial product.
+
+This includes:
+
+* Commercial email delivery platforms,
+* Multi-tenant email SaaS products,
+* Email infrastructure orchestration services,
+* Bulk email management platforms,
+* Hosted SMTP routing products,
+* White-labeled email systems.
+
+5.3 Remove Notices
+
+You may not remove or alter:
+
+* Copyright notices,
+* Attribution notices,
+* License notices,
+* Branding references where required,
+* Legal headers.
+
+5.4 Misrepresentation
+
+You may not falsely claim:
+
+* Ownership of the Licensed Work,
+* Original authorship,
+* Official partnership,
+* Certification,
+* Sponsorship by the Licensor.
+
+5.5 Trademark Usage
+
+This License does not grant trademark rights.
+
+You may not use the “Mail-Bridge” name, logo, branding, or related identifiers in a way that implies endorsement or official association without written permission.
+
+5.6 License Circumvention
+
+You may not attempt to bypass:
+
+* License restrictions,
+* Usage controls,
+* Deployment limitations,
+* Commercial restrictions,
+* Feature enforcement systems.
+
+6. Source Code Distribution
+
+You may distribute modified or unmodified versions of the Licensed Work only if:
+
+* The distribution remains under this License,
+* All copyright notices are retained,
+* All license files are retained,
+* The recipient receives a copy of this License,
+* You clearly document modifications,
+* You do not violate Section 5.
+
+Any redistribution must not enable prohibited commercial usage.
+
+7. Contributor License
+
+Unless explicitly agreed otherwise in writing:
+
+* Any contribution submitted to Mail-Bridge is licensed to the Licensor on a perpetual, worldwide, irrevocable, sublicensable basis.
+* Contributors retain copyright ownership of their own contributions.
+* Contributors grant the Licensor rights necessary to distribute and relicense contributions.
+
+By submitting a contribution, you confirm that:
+
+* You have the legal right to submit it,
+* The contribution does not knowingly infringe third-party rights,
+* The contribution complies with applicable laws.
+
+8. Compliance Requirements
+
+If you use Mail-Bridge in production, you must:
+
+* Maintain accurate internal records of deployments,
+* Comply with applicable email regulations,
+* Comply with anti-spam laws,
+* Comply with privacy regulations,
+* Maintain appropriate security practices,
+* Protect API credentials and SMTP credentials,
+* Use lawful recipient acquisition practices.
+
+Examples of applicable regulations may include:
+
+* GDPR
+* CAN-SPAM
+* PECR
+* CASL
+* DPDP Act (India)
+* SOC 2 security controls
+* ISO 27001 operational controls
+
+Compliance responsibility remains solely with the user.
+
+9. Security and Abuse
+
+You may not use Mail-Bridge:
+
+* For spam operations,
+* For phishing,
+* For malware distribution,
+* For credential harvesting,
+* For illegal automation,
+* For unauthorized bulk messaging,
+* For deceptive communications,
+* For abuse of third-party email infrastructure.
+
+The Licensor reserves the right to publicly revoke commercial permissions for abusive actors.
+
+10. Enterprise Licensing
+
+Organizations seeking to:
+
+* Offer Mail-Bridge commercially,
+* Provide hosted services,
+* Embed Mail-Bridge into commercial platforms,
+* Remove commercial restrictions,
+* Obtain trademark permissions,
+* Access enterprise support,
+* Access commercial add-ons,
+* Obtain OEM rights,
+* Obtain white-label rights,
+* Receive commercial SLAs,
+* Operate multi-tenant offerings,
+
+must obtain a separate commercial agreement from the Licensor.
+
+11. Audit Rights
+
+For commercial or enterprise deployments exceeding 500 active users or high-volume email infrastructure usage, the Licensor may request reasonable written confirmation of compliance.
+
+Such requests:
+
+* Must be reasonable in scope,
+* Must not require disclosure of confidential business data beyond licensing compliance,
+* Must not occur more than once annually unless material violations are suspected.
+
+Failure to comply may result in termination under Section 14.
+
+12. Open Source Dependencies
+
+Mail-Bridge may include dependencies licensed under separate open source licenses.
+
+Those components remain governed by their respective licenses.
+
+If any conflict exists between this License and a third-party dependency license, the dependency license governs only that dependency.
+
+13. Change License
+
+13.1 Conversion
+
+On the Change Date, this Licensed Work will automatically convert to:
+
+**Apache License 2.0**
+
+unless otherwise specified by the Licensor.
+
+13.2 Change Date
+
+The default Change Date for each released version of Mail-Bridge is:
+
+**Four (4) years after the public release date of that version.**
+
+The Licensor may publish a different Change Date for specific releases.
+
+14. Termination
+
+This License automatically terminates if you violate any material term of this License.
+
+Upon termination, you must:
+
+* Stop using the Licensed Work,
+* Stop distributing the Licensed Work,
+* Remove active deployments where required by law,
+* Destroy unauthorized commercial copies.
+
+Termination does not limit the Licensor’s legal remedies.
+
+Sections intended to survive termination shall remain enforceable.
+
+15. No Warranty
+
+THE LICENSED WORK IS PROVIDED “AS IS” WITHOUT WARRANTY OF ANY KIND.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR DISCLAIMS ALL WARRANTIES, INCLUDING:
+
+* MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE,
+* NON-INFRINGEMENT,
+* AVAILABILITY,
+* SECURITY,
+* PERFORMANCE,
+* DATA ACCURACY.
+
+YOU ASSUME ALL RISK ASSOCIATED WITH USING THE LICENSED WORK.
+
+16. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE LICENSOR SHALL NOT BE LIABLE FOR:
+
+* INDIRECT DAMAGES,
+* INCIDENTAL DAMAGES,
+* SPECIAL DAMAGES,
+* CONSEQUENTIAL DAMAGES,
+* LOSS OF PROFITS,
+* LOSS OF DATA,
+* BUSINESS INTERRUPTION,
+* SECURITY INCIDENTS,
+* EMAIL DELIVERABILITY FAILURES,
+* THIRD-PARTY SERVICE FAILURES.
+
+THE TOTAL LIABILITY OF THE LICENSOR SHALL NOT EXCEED ONE HUNDRED UNITED STATES DOLLARS (USD $100).
+
+17. Governing Law
+
+This License shall be governed by and interpreted under the laws of the jurisdiction selected by the Licensor.
+
+Unless otherwise specified by a commercial agreement, disputes shall be resolved in the courts chosen by the Licensor.
+
+18. Severability
+
+If any provision of this License is held unenforceable, the remaining provisions shall remain in full force and effect.
+
+19. Entire Agreement
+
+This License constitutes the complete agreement regarding the Licensed Work and supersedes prior understandings relating to the subject matter.
+
+20. Recommended Repository Files
+
+For production-grade compliance, the Licensor should maintain:
+
+* LICENSE
+* NOTICE
+* TRADEMARKS.md
+* SECURITY.md
+* CONTRIBUTING.md
+* CODE_OF_CONDUCT.md
+* COMMERCIAL_LICENSE.md
+* THIRD_PARTY_LICENSES.md
+* PRIVACY.md (if telemetry exists)
+* DPA.md (if enterprise processing agreements are offered)
+
+21. Recommended Commercial Policy
+
+The Licensor may separately offer:
+
+* Commercial SaaS rights
+* OEM licensing
+* White-label licensing
+* Managed hosting rights
+* Enterprise SLAs
+* Priority support
+* Commercial integrations
+* Closed-source extensions
+* Revenue-sharing partnerships
+
+These rights are NOT granted by this License.
+
+22. Attribution
+
+Copyright (c) 2026 Mail-Bridge Contributors.
+
+All rights reserved except as expressly granted under this License.
+
+Appendix A — Practical Interpretation
+
+Allowed Without Commercial Agreement
+
+* Self-hosting internally
+* Using Mail-Bridge for your own business
+* Sending your company emails
+* Modifying Mail-Bridge internally
+* Using Mail-Bridge in development environments
+* Running Mail-Bridge for personal projects
+
+Not Allowed Without Commercial Agreement
+
+* Selling Mail-Bridge hosting
+* Launching a Mail-Bridge SaaS
+* Offering public managed instances
+* Creating a competing email platform
+* Reselling Mail-Bridge commercially
+* White-labeling Mail-Bridge as your own hosted platform
+
+Appendix B — Suggested Repository Notice
+
+Mail-Bridge is source-available software licensed under the Mail-Bridge Business Source License (MB-BUSL).
+
+You may self-host and use Mail-Bridge internally.
+
+Commercial hosting, SaaS offerings, managed services, and competitive commercialization require a separate commercial agreement.
+
+See the LICENSE file for full terms.

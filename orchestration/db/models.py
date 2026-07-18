@@ -219,6 +219,10 @@ class ApplicationLog(Base):
     email_subject = Column(String(500))
     reply_count = Column(Integer, nullable=False, default=0)
     notes = Column(Text)
+    # Mail-Bridge delivery tracking
+    mailbridge_email_id = Column(UUID(as_uuid=True), nullable=True)
+    email_delivery_status = Column(String(20), nullable=False, default="pending")
+    email_delivered_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
@@ -420,6 +424,33 @@ class UserProfile(Base):
     social_links = relationship("UserSocialLink", back_populates="profile", cascade="all, delete-orphan", order_by="UserSocialLink.order_index")
 
 
+class UserMailCredential(Base):
+    """Maps a JobHunter user to their Mail-Bridge credential UUID.
+
+    Each user connects their own Gmail (or SMTP) account via Mail-Bridge OAuth.
+    The returned credential_id is stored here so mail_service can look it up
+    at send time without a hard-coded env UUID.
+    """
+
+    __tablename__ = "user_mail_credentials"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    mailbridge_credential_id = Column(UUID(as_uuid=True), nullable=False)
+    provider_type = Column(String(20), nullable=False, default="gmail")
+    from_email = Column(String(255), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    user = relationship("User", backref="mail_credential")
+
+
 class UserExperience(Base):
     __tablename__ = "user_experience"
 
@@ -533,4 +564,45 @@ class UserSocialLink(Base):
     order_index = Column(Integer, nullable=False, default=0)
 
     profile = relationship("UserProfile", back_populates="social_links")
+
+
+# ── API Sourced Jobs models ───────────────────────────────────────────────────
+
+class ApiSourcedJob(Base):
+    __tablename__ = "api_sourced_jobs"
+
+    job_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    company_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.company_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source = Column(String(50), nullable=False)
+    source_actor_id = Column(String(255))
+    external_id = Column(String(255), nullable=False)
+    title = Column(String(500))
+    company_name = Column(String(255))
+    company_domain = Column(String(255))
+    location = Column(String(255))
+    remote_type = Column(String(20))
+    salary_min = Column(Numeric(12, 2))
+    salary_max = Column(Numeric(12, 2))
+    experience_min = Column(Integer)
+    experience_max = Column(Integer)
+    description = Column(Text)
+    skills_required = Column(ARRAY(Text), nullable=False, default=list)
+    job_type = Column(String(20))
+    apply_email = Column(String(255))
+    email_trust = Column(String(20), nullable=False, default="unknown")
+    apply_url = Column(Text)
+    posted_at = Column(DateTime(timezone=True))
+    scraped_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String(20), nullable=False, default="raw")
+    extra_data = Column(JSONB, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("source", "external_id", name="api_jobs_source_external_id_unique"),
+    )
 

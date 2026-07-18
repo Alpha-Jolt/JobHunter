@@ -66,10 +66,17 @@ class LLMConfig(BaseSettings):
 class MailConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # deprecated -- Mail-Bridge handles delivery; kept for backward compat
     sendgrid_api_key: Optional[str] = Field(default=None, alias="SENDGRID_API_KEY")
-    mail_sender_email: str = Field(default="[EMAIL_ADDRESS]", alias="MAIL_SENDER_EMAIL")
-    mail_bridge_url: str = Field(default="http://localhost:3000", alias="MAIL_BRIDGE_URL")
+    mail_sender_email: str = Field(default="apply@myjobhunter.in", alias="MAIL_SENDER_EMAIL")
+
+    # Mail-Bridge v2 connection
+    mail_bridge_url: str = Field(default="http://localhost:3009", alias="MAIL_BRIDGE_URL")
     mail_bridge_api_key: str = Field(default="", alias="MAIL_BRIDGE_API_KEY")
+
+    # Mail-Bridge webhook verification
+    mailbridge_webhook_secret: str = Field(default="", alias="MAILBRIDGE_WEBHOOK_SECRET")
+    mailbridge_webhook_id: Optional[str] = Field(default=None, alias="MAILBRIDGE_WEBHOOK_ID")
 
 
 

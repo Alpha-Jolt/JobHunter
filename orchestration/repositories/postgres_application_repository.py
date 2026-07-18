@@ -225,6 +225,34 @@ class PostgresApplicationRepository(ApplicationLogBase):
                 {"application_id": str(application_id)},
             )
 
+    async def update_email_delivery(
+        self,
+        mailbridge_email_id: str,
+        delivery_status: str,
+        delivered_at: datetime | None,
+    ) -> None:
+        """Update email delivery status by Mail-Bridge email_id.
+
+        Called by the webhook receiver when Mail-Bridge pushes a delivery event.
+
+        Args:
+            mailbridge_email_id: The email_id returned by Mail-Bridge on send.
+            delivery_status: 'delivered' or 'failed'.
+            delivered_at: Timestamp from Mail-Bridge sent_at field, or None on failure.
+        """
+        import orchestration.db.models as _m
+        ApplicationLog = _m.ApplicationLog
+
+        values: dict = {"email_delivery_status": delivery_status}
+        if delivered_at is not None:
+            values["email_delivered_at"] = delivered_at
+
+        await self._session.execute(
+            update(ApplicationLog)
+            .where(ApplicationLog.mailbridge_email_id == mailbridge_email_id)
+            .values(**values)
+        )
+
     async def count_by_user(self, user_id: str) -> int:
         """Count applications for a user.
 
