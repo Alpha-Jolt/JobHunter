@@ -69,7 +69,9 @@ export function VariantCard({ variant, onApprove, onReject }: VariantCardProps) 
         return res.blob();
       })
       .then((blob) => {
-        const blobUrl = window.URL.createObjectURL(blob);
+        // Force MIME type for PDF so the browser opens it in the viewer instead of downloading
+        const properBlob = format === "pdf" ? new Blob([blob], { type: "application/pdf" }) : blob;
+        const blobUrl = window.URL.createObjectURL(properBlob);
         if (action === "preview" && format === "pdf") {
           window.open(blobUrl, "_blank");
         } else {

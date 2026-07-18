@@ -37,6 +37,14 @@ const nextConfig: NextConfig = {
         source: "/health",
         destination: `${internalApiUrl}/health`,
       },
+      {
+        source: "/jobhunter-resumes/:path*",
+        destination: "http://jobhunter-minio:9000/jobhunter-resumes/:path*",
+      },
+      {
+        source: "/jobhunter-avatars/:path*",
+        destination: "http://jobhunter-minio:9000/jobhunter-avatars/:path*",
+      },
     ];
   },
 
