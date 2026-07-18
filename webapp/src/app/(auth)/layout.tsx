@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "JobHunter — Sign in" };
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background-subtle px-4">
-      <div className="w-full max-w-sm">
+    <div className="auth-shell">
+      <div className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">
-            <span className="text-brand-charcoal dark:text-foreground">Job</span>
-            <span className="text-brand-orange">Hunter</span>
-          </h1>
+          <Link href="/" className="inline-block font-brand text-[2rem] font-semibold tracking-wide leading-none">
+            <span className="text-brand-charcoal dark:text-paper">Job</span>
+            <span className="text-ember">Hunter</span>
+          </Link>
+          <p className="mt-3 text-sm text-foreground-muted">Apply smart, not just fast.</p>
         </div>
         {children}
       </div>

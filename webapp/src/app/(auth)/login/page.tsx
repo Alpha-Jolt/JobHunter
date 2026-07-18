@@ -4,15 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/Ca
 
 export default function LoginPage() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sign in to your account</CardTitle>
+    <Card className="shadow-[0_24px_48px_-24px_rgba(16,16,18,0.18)]">
+      <CardHeader className="pb-2">
+        <p className="section-label !mb-2">Welcome back</p>
+        <CardTitle className="text-xl">Sign in to your account</CardTitle>
       </CardHeader>
       <CardContent>
         <LoginForm />
-        <p className="mt-4 text-center text-sm text-muted-foreground">
+        <p className="mt-5 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="text-primary hover:underline font-medium">
+          <Link href="/signup" className="text-foreground font-semibold hover:text-ember transition-colors">
             Sign up
           </Link>
         </p>

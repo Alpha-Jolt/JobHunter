@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Fredoka } from "next/font/google";
+import { motion, AnimatePresence } from "framer-motion";
 import { LayoutDashboard, Briefcase, FileText, Layers, Send, Menu, X, Bell } from "lucide-react";
 import { cn } from "@/shared/utils/cn";
 import { useUiStore } from "@/shared/state/uiStore";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserMenu } from "./UserMenu";
-
-const fredoka = Fredoka({ subsets: ["latin"], weight: ["600"] });
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,28 +23,20 @@ export function Navbar() {
 
   return (
     <>
-      {/* Top Header */}
-      <header className="fixed top-0 inset-x-0 lg:left-64 z-40 h-14 border-b border-border bg-card flex items-center px-4 gap-3 transition-all">
+      <header className="fixed top-0 inset-x-0 lg:left-64 z-40 h-14 border-b border-border bg-card/80 backdrop-blur-xl flex items-center px-4 gap-3">
         <button
-          className="lg:hidden p-2 rounded-md hover:bg-secondary"
+          className="lg:hidden p-2 rounded-[var(--radius-sm)] hover:bg-secondary transition-colors"
           onClick={() => setSidebarOpen(!sidebarOpen)}
           aria-label="Toggle menu"
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
 
-        {/* Global Search */}
-        {/* <div className="flex-1 max-w-md hidden sm:flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-full border border-transparent focus-within:border-border">
-          <Search className="h-4 w-4 text-foreground-muted" />
-          <input 
-            type="text" 
-            placeholder="Search..." 
-            className="bg-transparent border-none outline-none text-sm w-full"
-          />
-        </div> */}
-
-        <div className="ml-auto flex items-center gap-2">
-          <button className="p-2 text-foreground-muted hover:text-foreground rounded-full hover:bg-secondary">
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            className="p-2 text-foreground-muted hover:text-foreground rounded-full hover:bg-secondary transition-colors"
+            aria-label="Notifications"
+          >
             <Bell className="h-5 w-5" />
           </button>
           <ThemeToggle />
@@ -54,52 +44,67 @@ export function Navbar() {
         </div>
       </header>
 
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            className="fixed inset-0 z-30 bg-ink/40 backdrop-blur-[2px] lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
-      {/* Sidebar (Desktop + Mobile) */}
       <aside
         className={cn(
-          "fixed top-0 left-0 bottom-0 z-50 w-64 bg-card border-r border-border transition-transform lg:translate-x-0 flex flex-col",
+          "fixed top-0 left-0 bottom-0 z-50 w-64 bg-card border-r border-border transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] lg:translate-x-0 flex flex-col",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="h-14 flex items-center px-4 border-b border-border justify-between lg:justify-center">
-          <Link href="/dashboard" className={cn("text-2xl font-bold tracking-wide", fredoka.className)}>
-            <span className="text-brand-charcoal dark:text-foreground">Job</span>
-            <span className="text-brand-orange">Hunter</span>
+        <div className="h-14 flex items-center px-5 border-b border-border justify-between lg:justify-start">
+          <Link href="/dashboard" className="font-brand text-[1.55rem] font-semibold tracking-wide leading-none">
+            <span className="text-brand-charcoal">Job</span>
+            <span className="text-ember">Hunter</span>
           </Link>
           <button
-            className="lg:hidden p-2 rounded-md hover:bg-secondary"
+            className="lg:hidden p-2 rounded-[var(--radius-sm)] hover:bg-secondary"
             onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                pathname.startsWith(href)
-                  ? "bg-accent text-accent-foreground"
-                  : "text-foreground-muted hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </Link>
-          ))}
+        <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
+          <p className="font-mono-label text-muted-foreground px-3 py-2 mb-1">Workspace</p>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "group relative flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-sm)] text-sm font-medium transition-colors duration-200",
+                  active
+                    ? "nav-item-active"
+                    : "text-foreground-muted hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                <Icon className={cn("h-4 w-4 transition-colors", active ? "text-ember" : "opacity-80")} />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
+
+        <div className="p-4 border-t border-border">
+          <p className="font-mono-label text-muted-foreground mb-1">Apply smart</p>
+          <p className="text-xs text-foreground-muted leading-relaxed">
+            Tailor. Approve. Send — one queue at a time.
+          </p>
+        </div>
       </aside>
     </>
   );

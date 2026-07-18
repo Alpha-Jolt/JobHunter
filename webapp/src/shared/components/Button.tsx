@@ -4,22 +4,28 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/shared/utils/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold tracking-[-0.01em] transition-[transform,filter,background,color,border-color] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.99]",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-brand-orange-dark min-h-[44px] px-4",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 min-h-[44px] px-4",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 min-h-[44px] px-4",
-        outline: "border border-input-border bg-input text-foreground hover:bg-secondary min-h-[44px] px-4",
-        ghost: "text-foreground hover:bg-secondary min-h-[44px] px-4",
-        link: "text-primary underline-offset-4 hover:underline px-0",
+        default:
+          "bg-primary text-primary-foreground hover:brightness-[0.94] hover:-translate-y-px min-h-[44px] px-5 rounded-[var(--radius-sm)]",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 min-h-[44px] px-5 rounded-[var(--radius-sm)]",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:brightness-[0.94] min-h-[44px] px-5 rounded-[var(--radius-sm)]",
+        outline:
+          "border border-border-strong bg-transparent text-foreground hover:border-foreground hover:-translate-y-px min-h-[44px] px-5 rounded-[var(--radius-sm)]",
+        ghost:
+          "text-foreground hover:bg-secondary min-h-[44px] px-4 rounded-[var(--radius-sm)]",
+        link: "text-primary underline-offset-4 hover:underline px-0 font-medium",
+        ink: "bg-ink text-paper hover:brightness-125 hover:-translate-y-px min-h-[44px] px-5 rounded-[var(--radius-sm)] dark:bg-paper dark:text-ink",
       },
       size: {
-        sm: "h-9 px-3 text-xs",
-        md: "min-h-[44px] px-4",
+        sm: "h-9 px-3.5 text-xs rounded-[var(--radius-sm)]",
+        md: "min-h-[44px] px-5 text-[15px]",
         lg: "min-h-[52px] px-6 text-base",
-        icon: "h-11 w-11",
+        icon: "h-11 w-11 rounded-[var(--radius-sm)]",
       },
     },
     defaultVariants: { variant: "default", size: "md" },

@@ -10,6 +10,7 @@ import { JobCard } from "@/features/jobs/JobCard";
 import { JobFilters } from "@/features/jobs/JobFilters";
 import { Skeleton } from "@/shared/components/Skeleton";
 import { Button } from "@/shared/components/Button";
+import { PageHeader } from "@/shared/components/Motion";
 import { config } from "@/lib/config";
 import { getAccessToken } from "@/shared/api/client";
 import type { JobRecord } from "@/shared/api/types";
@@ -125,39 +126,50 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Jobs</h1>
-        {selectedJobIds.size > 0 && (
-          <div className="flex items-center gap-4 bg-secondary px-4 py-2 rounded-lg border border-border shadow-sm">
-            <span className="text-sm font-medium">{selectedJobIds.size} selected</span>
-            <Button size="sm" onClick={handleBulkGenerate} disabled={isBulkGenerating}>
-              {isBulkGenerating ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-3.5 w-3.5 rounded-full border-2 border-primary-foreground border-r-transparent animate-spin" />
-                  {bulkProgress}
-                </span>
-              ) : (
-                "Generate Variants"
-              )}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelectedJobIds(new Set())} disabled={isBulkGenerating}>
-              Clear
-            </Button>
-          </div>
-        )}
-      </div>
-      <p className="text-sm text-muted-foreground mt-1">Discover and apply to matching roles.</p>
-      
+    <div className="flex flex-col gap-2">
+      <PageHeader
+        label="Queue"
+        title="Open roles"
+        description="Discover matching jobs, select a batch, and generate tailored variants."
+        actions={
+          selectedJobIds.size > 0 ? (
+            <div className="flex items-center gap-3 bg-card px-4 py-2.5 rounded-[var(--radius-sm)] border border-border-strong shadow-[0_12px_32px_-18px_rgba(16,16,18,0.35)]">
+              <span className="font-mono-label text-foreground">{selectedJobIds.size} selected</span>
+              <Button size="sm" onClick={handleBulkGenerate} disabled={isBulkGenerating}>
+                {isBulkGenerating ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 rounded-full border-2 border-primary-foreground border-r-transparent animate-spin" />
+                    {bulkProgress}
+                  </span>
+                ) : (
+                  "Generate Variants"
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedJobIds(new Set())}
+                disabled={isBulkGenerating}
+              >
+                Clear
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
+
       <JobFilters />
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52" />)}
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-52 rounded-[var(--radius)]" />
+          ))}
         </div>
       ) : filteredJobs.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground text-sm">
-          No jobs found. Try adjusting your filters.
+        <div className="text-center py-20 border border-dashed border-border-strong rounded-[var(--radius)]">
+          <p className="font-display text-lg text-foreground">No roles in view</p>
+          <p className="text-sm text-muted-foreground mt-2">Try adjusting your filters or search.</p>
         </div>
       ) : (
         <>
@@ -172,12 +184,12 @@ export default function JobsPage() {
             ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 border-t border-border">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-5 border-t border-border">
             <div className="text-sm text-muted-foreground">
               Showing {jobs.length > 0 ? (currentPage - 1) * limit + 1 : 0} to{" "}
               {Math.min(currentPage * limit, total)} of {total} jobs
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -187,7 +199,7 @@ export default function JobsPage() {
               >
                 Previous
               </Button>
-              
+
               <form onSubmit={handlePageSubmit} className="flex items-center gap-2 mx-2">
                 <span className="text-sm text-muted-foreground">Page</span>
                 <input
@@ -195,10 +207,12 @@ export default function JobsPage() {
                   min="1"
                   value={pageInput}
                   onChange={(e) => setPageInput(e.target.value)}
-                  className="h-8 w-16 rounded-md border border-input-border bg-input px-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-8 w-16 rounded-[var(--radius-sm)] border border-input-border bg-input px-2 text-sm text-center focus:outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--ember-glow)]"
                 />
                 <span className="text-sm text-muted-foreground">of {totalPages}</span>
-                <button type="submit" className="hidden">Go</button>
+                <button type="submit" className="hidden">
+                  Go
+                </button>
               </form>
 
               <Button
