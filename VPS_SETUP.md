@@ -47,10 +47,11 @@ SSL mode: **Full (strict)** if origin cert covers `*.myjobhunter.in`.
 ```bash
 cd /docker/JobHunter
 cp env.example .env
-nano .env   # optional local edits
+nano .env   # paste/fill secrets yourself — CI never creates or edits .env
 ```
 
-CI deploy copies `env.example` → `.env` on each push to `Feature/Deploy`, then overlays any non-empty GitHub Production secrets (same key names). Update secrets in `env.example` (or GitHub) — not by hand-editing a partial list in the workflow.
+GitHub secrets needed for deploy: **`HOST_IP`**, **`HOST_USER`**, **`SSH_PRIVATE_KEY`** only.  
+Everything else lives on the VPS in `/docker/JobHunter/.env` (and `mailbridge/.env` if you use Mail-Bridge).
 
 ### Required production values (must match this shape)
 
