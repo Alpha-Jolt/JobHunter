@@ -64,15 +64,29 @@ jobs:
             git clean -fd -e .env -e .deploy-secrets -e mailbridge/.env -e registries -e scraper/output -e scraper/logs
             git stash clear || true
 
+            # Static DB defaults (same style as JWT/approval secrets). Override via GitHub
+            # secrets if set; empty secrets must not wipe these values.
+            JH_PG_USER="${{ secrets.POSTGRES_USER }}"
+            JH_PG_PASS="${{ secrets.POSTGRES_PASSWORD }}"
+            JH_PG_DB="${{ secrets.POSTGRES_DB }}"
+            JH_DB_URL="${{ secrets.DATABASE_URL }}"
+            JH_PG_USER="${JH_PG_USER:-jobhunter}"
+            JH_PG_PASS="${JH_PG_PASS:-jobhunter}"
+            JH_PG_DB="${JH_PG_DB:-jobhunter}"
+            if [ -z "$JH_DB_URL" ]; then
+              JH_DB_URL="postgresql+asyncpg://${JH_PG_USER}:${JH_PG_PASS}@postgres:5432/${JH_PG_DB}"
+            fi
+
             # Write JobHunter .env from GitHub secrets (no leading spaces)
             cat > /docker/JobHunter/.env <<EOF
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DATABASE_URL=${JH_DB_URL}
             DB_POOL_SIZE=5
             DB_MAX_OVERFLOW=10
             USE_ALEMBIC_MIGRATIONS=true
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+            POSTGRES_USER=${JH_PG_USER}
+            POSTGRES_PASSWORD=${JH_PG_PASS}
+            POSTGRES_DB=${JH_PG_DB}
+            POSTGRES_URL=${JH_DB_URL}
             API_HOST=0.0.0.0
             API_PORT=8000
             LOG_LEVEL=INFO
@@ -121,7 +135,6 @@ jobs:
             SECRET_KEY=${{ secrets.ADMIN_API_SECRET_KEY }}
             ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
             ADMIN_PASSWORD_HASH=${{ secrets.ADMIN_PASSWORD_HASH }}
-            POSTGRES_URL=${{ secrets.DATABASE_URL }}
             EOF
 
             # Strip accidental leading whitespace from heredoc/YAML

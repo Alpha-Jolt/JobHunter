@@ -6,14 +6,15 @@ from typing import Optional
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_DEFAULT_DATABASE_URL = (
+    "postgresql+asyncpg://jobhunter:jobhunter@postgres:5432/jobhunter"
+)
+
 
 class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = Field(
-        default="postgresql+asyncpg://jobhunter:jobhunter@postgres:5432/jobhunter",
-        alias="DATABASE_URL",
-    )
+    database_url: str = Field(default=_DEFAULT_DATABASE_URL, alias="DATABASE_URL")
     db_pool_size: int = Field(default=10, alias="DB_POOL_SIZE")
     db_max_overflow: int = Field(default=20, alias="DB_MAX_OVERFLOW")
     use_alembic_migrations: bool = Field(
@@ -24,8 +25,9 @@ class DatabaseConfig(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def _empty_db_url(cls, v: object) -> object:
+        # Empty GitHub secret must not become None
         if v is None or (isinstance(v, str) and not v.strip()):
-            return None
+            return _DEFAULT_DATABASE_URL
         return v
 
 
@@ -55,18 +57,23 @@ class APIConfig(BaseSettings):
         mode="before",
     )
     @classmethod
-    def _empty_str_to_default(cls, v: object) -> object:
-        # Empty GitHub secrets become "" and would override defaults — treat as unset
+    def _empty_str_to_default(cls, v: object, info) -> object:
         if v is None or (isinstance(v, str) and not v.strip()):
-            return None
+            defaults = {
+                "approval_token_secret": "changeme-32-char-secret-key-here!",
+                "secret_key_approval": "changeme-32-char-secret-key-here!",
+                "internal_api_key": "dev-internal-api-key-change-me-32ch",
+            }
+            return defaults.get(info.field_name, v)
         return v
 
     @model_validator(mode="after")
     def _ensure_approval_secrets(self) -> "APIConfig":
-        # Fall back: APPROVAL_TOKEN_SECRET ← SECRET_KEY_APPROVAL when missing/short
         if len(self.approval_token_secret) < 32:
             if len(self.secret_key_approval) >= 32:
-                object.__setattr__(self, "approval_token_secret", self.secret_key_approval)
+                object.__setattr__(
+                    self, "approval_token_secret", self.secret_key_approval
+                )
             else:
                 raise ValueError(
                     "APPROVAL_TOKEN_SECRET (or SECRET_KEY_APPROVAL) must be at least 32 characters"
@@ -97,15 +104,10 @@ class LLMConfig(BaseSettings):
 class MailConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # deprecated -- Mail-Bridge handles delivery; kept for backward compat
     sendgrid_api_key: Optional[str] = Field(default=None, alias="SENDGRID_API_KEY")
     mail_sender_email: str = Field(default="apply@myjobhunter.in", alias="MAIL_SENDER_EMAIL")
-
-    # Mail-Bridge v2 connection
     mail_bridge_url: str = Field(default="http://localhost:3009", alias="MAIL_BRIDGE_URL")
     mail_bridge_api_key: str = Field(default="", alias="MAIL_BRIDGE_API_KEY")
-
-    # Mail-Bridge webhook verification
     mailbridge_webhook_secret: str = Field(default="", alias="MAILBRIDGE_WEBHOOK_SECRET")
     mailbridge_webhook_id: Optional[str] = Field(default=None, alias="MAILBRIDGE_WEBHOOK_ID")
 
@@ -113,20 +115,21 @@ class MailConfig(BaseSettings):
 class AuthConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    jwt_secret: str = Field(default="changeme-jwt-secret-key-minimum-32chars!", alias="JWT_SECRET")
+    jwt_secret: str = Field(
+        default="changeme-jwt-secret-key-minimum-32chars!", alias="JWT_SECRET"
+    )
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_expiry_minutes: int = Field(default=15, alias="JWT_EXPIRY_MINUTES")
     refresh_token_expiry_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRY_DAYS")
     min_password_length: int = Field(default=8, alias="MIN_PASSWORD_LENGTH")
     cookie_secure: bool = Field(default=False, alias="COOKIE_SECURE")
-    # e.g. ".myjobhunter.in" so app + api subdomains share refresh_token
     cookie_domain: str = Field(default="", alias="COOKIE_DOMAIN")
 
     @field_validator("jwt_secret", mode="before")
     @classmethod
     def _empty_jwt_to_default(cls, v: object) -> object:
         if v is None or (isinstance(v, str) and not v.strip()):
-            return None
+            return "changeme-jwt-secret-key-minimum-32chars!"
         return v
 
     @field_validator("jwt_secret")
@@ -144,21 +147,33 @@ class MinIOConfig(BaseSettings):
     minio_access_key: str = Field(default="minioadmin", alias="MINIO_ACCESS_KEY")
     minio_secret_key: str = Field(default="minioadmin", alias="MINIO_SECRET_KEY")
     minio_bucket: str = Field(default="jobhunter-resumes", alias="MINIO_BUCKET_NAME")
-    minio_avatar_bucket: str = Field(default="jobhunter-avatars", alias="MINIO_AVATAR_BUCKET_NAME")
+    minio_avatar_bucket: str = Field(
+        default="jobhunter-avatars", alias="MINIO_AVATAR_BUCKET_NAME"
+    )
     minio_secure: bool = Field(default=False, alias="MINIO_SECURE")
-    minio_external_endpoint: str | None = Field(default=None, alias="MINIO_EXTERNAL_ENDPOINT")
-    minio_external_secure: bool | None = Field(default=None, alias="MINIO_EXTERNAL_SECURE")
+    minio_external_endpoint: str | None = Field(
+        default=None, alias="MINIO_EXTERNAL_ENDPOINT"
+    )
+    minio_external_secure: bool | None = Field(
+        default=None, alias="MINIO_EXTERNAL_SECURE"
+    )
 
 
 class RedisConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # Compose service name is `redis` (container may be jobhunter-redis-1)
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
+
+
 class OtelConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    otel_exporter_otlp_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
-    otel_service_name: str = Field(default="jobhunter-orchestration", alias="OTEL_SERVICE_NAME")
+    otel_exporter_otlp_endpoint: Optional[str] = Field(
+        default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT"
+    )
+    otel_service_name: str = Field(
+        default="jobhunter-orchestration", alias="OTEL_SERVICE_NAME"
+    )
+
 
 class Settings(BaseSettings):
     """Aggregated application settings."""
@@ -209,7 +224,7 @@ class Settings(BaseSettings):
         if isinstance(v, dict):
             return MailConfig(**v)
         return v or MailConfig()
-        
+
     @field_validator("redis", mode="before")
     @classmethod
     def _build_redis(cls, v):
@@ -220,9 +235,5 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return the cached application settings singleton.
-
-    Returns:
-        Settings instance loaded from environment / .env file.
-    """
+    """Return the cached application settings singleton."""
     return Settings()
