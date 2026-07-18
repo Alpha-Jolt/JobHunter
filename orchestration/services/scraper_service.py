@@ -11,13 +11,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.models.job_record import JobRecord
 
 
+def _skills_to_list(value) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    if isinstance(value, str):
+        # Defensive: union placeholder / bad cast should not blow up the API
+        text = value.strip()
+        if not text or text in ("{}", "[]", "null"):
+            return []
+        return [text]
+    try:
+        return list(value)
+    except TypeError:
+        return []
+
+
 def _orm_job_to_record(row) -> JobRecord:
     return JobRecord(
         job_id=uuid.UUID(str(row.job_id)),
-        source=row.source,
-        external_id=row.external_id,
-        title=row.title,
-        company_name=row.company_name,
+        source=row.source or "",
+        external_id=row.external_id or "",
+        title=row.title or "",
+        company_name=row.company_name or "",
         company_domain=row.company_domain,
         location=row.location,
         remote_type=row.remote_type,
@@ -25,16 +42,16 @@ def _orm_job_to_record(row) -> JobRecord:
         salary_max=float(row.salary_max) if row.salary_max is not None else None,
         experience_min=row.experience_min,
         experience_max=row.experience_max,
-        description=row.description,
-        skills_required=list(row.skills_required or []),
-        job_type=row.job_type,
+        description=row.description or "",
+        skills_required=_skills_to_list(row.skills_required),
+        job_type=row.job_type or "fulltime",
         apply_email=row.apply_email,
-        email_trust=row.email_trust,
+        email_trust=row.email_trust or "unknown",
         apply_url=row.apply_url,
         posted_at=row.posted_at,
         scraped_at=row.scraped_at,
         last_seen_at=row.last_seen_at,
-        status=row.status,
+        status=row.status or "raw",
     )
 
 
@@ -82,6 +99,20 @@ class ScraperService:
             "errors": row.errors,
         }
 
+    async def _table_exists(self, table_name: str) -> bool:
+        from sqlalchemy import text
+
+        # Whitelist only — values are hardcoded callers, not user input
+        if table_name not in {"api_sourced_jobs", "career_jobs", "jobs"}:
+            return False
+        return bool(
+            (
+                await self._session.execute(
+                    text(f"SELECT to_regclass('public.{table_name}') IS NOT NULL")
+                )
+            ).scalar()
+        )
+
     async def get_latest_jobs(
         self, source: Optional[str] = None, limit: int = 20, offset: int = 0, search: Optional[str] = None,
         include_career_jobs: bool = False
@@ -91,54 +122,55 @@ class ScraperService:
         CareerJob = _db_models.CareerJob
         Company = _db_models.Company
         ApiSourcedJob = _db_models.ApiSourcedJob
-        
-        from sqlalchemy import union_all, literal_column, cast, String, Numeric, Integer
-        
-        # Priority 1: ApiSourcedJob
-        api_stmt = select(
-            ApiSourcedJob.job_id.label("job_id"),
-            ApiSourcedJob.source.label("source"),
-            ApiSourcedJob.external_id.label("external_id"),
-            ApiSourcedJob.title.label("title"),
-            ApiSourcedJob.company_name.label("company_name"),
-            ApiSourcedJob.company_domain.label("company_domain"),
-            ApiSourcedJob.location.label("location"),
-            cast(literal_column("''"), String(50)).label("remote_type"),
-            cast(literal_column("null"), Numeric(12, 2)).label("salary_min"),
-            cast(literal_column("null"), Numeric(12, 2)).label("salary_max"),
-            cast(literal_column("null"), Integer).label("experience_min"),
-            cast(literal_column("null"), Integer).label("experience_max"),
-            ApiSourcedJob.description.label("description"),
-            cast(literal_column("'{}'"), String).label("skills_required"),
-            cast(literal_column("''"), String(50)).label("job_type"),
-            ApiSourcedJob.apply_email.label("apply_email"),
-            cast(literal_column("'unknown'"), String(20)).label("email_trust"),
-            ApiSourcedJob.apply_url.label("apply_url"),
-            ApiSourcedJob.created_at.label("posted_at"),
-            ApiSourcedJob.created_at.label("scraped_at"),
-            ApiSourcedJob.last_seen_at.label("last_seen_at"),
-            ApiSourcedJob.status.label("status"),
-            literal_column("1").label("sort_priority")
-        ).where(ApiSourcedJob.status != "closed")
 
-        if source and source not in ("apify", "hunter"):
-            api_stmt = api_stmt.where(literal_column("1") == literal_column("0"))
-        elif source in ("apify", "hunter"):
-            api_stmt = api_stmt.where(ApiSourcedJob.source == source)
+        from sqlalchemy import union_all, literal_column, cast, String, Numeric, or_
 
-        if search:
-            from sqlalchemy import or_
-            search_term = f"%{search}%"
-            api_stmt = api_stmt.where(
-                or_(
-                    ApiSourcedJob.title.ilike(search_term),
-                    ApiSourcedJob.company_name.ilike(search_term),
-                    ApiSourcedJob.description.ilike(search_term)
+        # Priority 1: ApiSourcedJob (skip if migration not applied yet)
+        stmts = []
+        if await self._table_exists("api_sourced_jobs"):
+            api_stmt = select(
+                ApiSourcedJob.job_id.label("job_id"),
+                ApiSourcedJob.source.label("source"),
+                ApiSourcedJob.external_id.label("external_id"),
+                ApiSourcedJob.title.label("title"),
+                ApiSourcedJob.company_name.label("company_name"),
+                ApiSourcedJob.company_domain.label("company_domain"),
+                ApiSourcedJob.location.label("location"),
+                ApiSourcedJob.remote_type.label("remote_type"),
+                ApiSourcedJob.salary_min.label("salary_min"),
+                ApiSourcedJob.salary_max.label("salary_max"),
+                ApiSourcedJob.experience_min.label("experience_min"),
+                ApiSourcedJob.experience_max.label("experience_max"),
+                ApiSourcedJob.description.label("description"),
+                ApiSourcedJob.skills_required.label("skills_required"),
+                ApiSourcedJob.job_type.label("job_type"),
+                ApiSourcedJob.apply_email.label("apply_email"),
+                ApiSourcedJob.email_trust.label("email_trust"),
+                ApiSourcedJob.apply_url.label("apply_url"),
+                ApiSourcedJob.posted_at.label("posted_at"),
+                ApiSourcedJob.scraped_at.label("scraped_at"),
+                ApiSourcedJob.last_seen_at.label("last_seen_at"),
+                ApiSourcedJob.status.label("status"),
+                literal_column("1").label("sort_priority"),
+            ).where(ApiSourcedJob.status != "closed")
+
+            if source and source not in ("apify", "hunter"):
+                api_stmt = api_stmt.where(literal_column("1") == literal_column("0"))
+            elif source in ("apify", "hunter"):
+                api_stmt = api_stmt.where(ApiSourcedJob.source == source)
+
+            if search:
+                search_term = f"%{search}%"
+                api_stmt = api_stmt.where(
+                    or_(
+                        ApiSourcedJob.title.ilike(search_term),
+                        ApiSourcedJob.company_name.ilike(search_term),
+                        ApiSourcedJob.description.ilike(search_term),
+                    )
                 )
-            )
+            stmts.append(api_stmt)
 
         # Priority 2: Job
-        
         j_stmt = select(
             Job.job_id.label("job_id"),
             Job.source.label("source"),
@@ -162,28 +194,26 @@ class ScraperService:
             Job.scraped_at.label("scraped_at"),
             Job.last_seen_at.label("last_seen_at"),
             Job.status.label("status"),
-            literal_column("2").label("sort_priority")
+            literal_column("2").label("sort_priority"),
         ).where(Job.status != "closed")
 
         if source and source != "career_page":
             j_stmt = j_stmt.where(Job.source == source)
         elif source == "career_page":
             j_stmt = j_stmt.where(literal_column("1") == literal_column("0"))
-            
+
         if search:
-            from sqlalchemy import or_
             search_term = f"%{search}%"
             j_stmt = j_stmt.where(
                 or_(
                     Job.title.ilike(search_term),
                     Job.company_name.ilike(search_term),
-                    Job.description.ilike(search_term)
+                    Job.description.ilike(search_term),
                 )
             )
+        stmts.append(j_stmt)
 
-        stmts = [j_stmt]
-
-        if include_career_jobs:
+        if include_career_jobs and await self._table_exists("career_jobs"):
             cj_stmt = select(
                 CareerJob.career_job_id.label("job_id"),
                 CareerJob.source_channel.label("source"),
@@ -207,38 +237,41 @@ class ScraperService:
                 CareerJob.scraped_at.label("scraped_at"),
                 CareerJob.last_seen_at.label("last_seen_at"),
                 CareerJob.status.label("status"),
-                literal_column("3").label("sort_priority")
+                literal_column("3").label("sort_priority"),
             ).select_from(
-                CareerJob.__table__.join(Company.__table__, CareerJob.company_id == Company.company_id)
+                CareerJob.__table__.join(
+                    Company.__table__, CareerJob.company_id == Company.company_id
+                )
             ).where(CareerJob.status != "closed")
 
             if source and source != "career_page":
                 cj_stmt = cj_stmt.where(literal_column("1") == literal_column("0"))
-                
+
             if search:
-                from sqlalchemy import or_
                 search_term = f"%{search}%"
                 cj_stmt = cj_stmt.where(
                     or_(
                         CareerJob.job_title.ilike(search_term),
                         Company.company_name.ilike(search_term),
-                        CareerJob.description.ilike(search_term)
+                        CareerJob.description.ilike(search_term),
                     )
                 )
-                
             stmts.append(cj_stmt)
-
-        stmts = [api_stmt] + stmts
 
         union_stmt = union_all(*stmts)
         subq = union_stmt.subquery()
-        
+
         count_stmt = select(func.count()).select_from(subq)
         total = (await self._session.execute(count_stmt)).scalar() or 0
-        
-        stmt = select(subq).order_by(subq.c.sort_priority.asc(), subq.c.last_seen_at.desc()).limit(limit).offset(offset)
+
+        stmt = (
+            select(subq)
+            .order_by(subq.c.sort_priority.asc(), subq.c.last_seen_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         result = await self._session.execute(stmt)
-        
+
         return [_orm_job_to_record(row) for row in result.all()], total
 
     async def get_job_counts(self) -> Dict:
