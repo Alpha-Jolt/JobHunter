@@ -228,11 +228,17 @@ __marimo__/
 .mimocode
 .kilo
 implementation
+CLAUDE.md
+graphify-out
+.graphifyignore
 
 # Work Logs
 LOGS.md
 SUMMARY.md
 REPORT.md
+
+# Backup
+backup
 
 *env*
 !env.example
